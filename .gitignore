@@ -4,6 +4,7 @@
 .toolchains/
 local.properties
 .codex-build/
+.codex-build-output/
 .codex-build-init.gradle
 .idea/
 .DS_Store

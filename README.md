@@ -1,6 +1,6 @@
 # PhairPlay
 
-PhairPlay is a free, open-source, ad-free AirPlay 2 receiver for Android TV and Fire TV. It lets your macOS or iOS/iPadOS device mirror its screen and audio directly to your TV — no Apple TV required.
+PhairPlay is a free, open-source AirPlay receiver for Android. The project began with a living-room experience for Android TV and Fire TV, and is expanding to phones and tablets while preserving the existing large-screen experience. Use an iPhone, iPad, or Mac to send supported audio, photos, and screen mirroring over your local network.
 
 ```
  macOS (Monterey+)            Android TV / Fire TV
@@ -16,13 +16,15 @@ PhairPlay is a free, open-source, ad-free AirPlay 2 receiver for Android TV and 
 
 ---
 
-## Current Status — v1.0.38 development candidate
+## Project Status — v1.0.42 development branch
 
-The current source candidate is **1.0.38** (`versionCode` 41). It includes restored protocol defaults, PIN-auth discovery/handshake fixes, and startup synchronization that can skip up to one second of audio already late against the shared PTP timeline. The `googletvDebug` build completed, but the startup change still needs device and group-playback validation. This is a development build, not a GitHub release. See the [Releases page](https://github.com/mazer666/PhairPlay/releases) for published packages; their feature set may differ from the current source.
+The current source is **1.0.42** (`versionCode` 45). This public repository is an independent development fork; it is not the original project's release channel, and no pull request to the original project is planned. Check this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) for packages; source builds may include changes that are not in a release.
+
+The main development goal is broader Android device compatibility without regressing the established tablet and TV layouts. The existing build variants target Google/Android TV (Android 10+) and Fire TV (Android 7.1+). Phone and tablet adaptation is in progress; the presence of Android support in the shared code does not mean every model has been validated. Playback, mDNS discovery, screen sizing, remote-control behavior, and audio synchronization can vary by Android version and vendor. See [docs/TESTING.md](docs/TESTING.md) for the validation scope and report device-specific results separately.
 
 The AirPlay 2 stack includes mDNS advertising (with standby recovery and Wi-Fi multicast lock), RTSP/HomeKit pairing, FairPlay key decryption, H.264 mirroring, AAC-ELD/AAC-LC/ALAC audio, realtime and buffered audio streams, PTP timing for multi-room playback, artwork/metadata display, and remote-control paths over MediaRemote and DACP. Playback, protocol, and synchronization support vary by Android device and sender; consult the testing guide for validation expectations.
 
-The Android app also includes an AirPlay-device discovery/management page and an optional bedside clock with date, calendar, and weather widgets. Weather requires internet access; the AirPlay receiver itself works on the local network without a cloud service.
+The Android app also includes an AirPlay-device discovery/management page and an optional bedside clock with date, calendar, and weather widgets. These screens are being adapted across phone, tablet, and TV window sizes. Weather requires internet access; AirPlay reception works on the local network without a cloud service.
 
 For portable build guidance, validation boundaries, synchronization and UI lessons, and maintenance recommendations, see the [PhairPlay maintenance playbook](docs/MAINTENANCE_PLAYBOOK_ZH.md).
 
@@ -48,10 +50,11 @@ Miracast and Google Cast receiver stacks are in progress (control-plane implemen
 - Access-control lockout after repeated failed pairing attempts
 
 ### App & Platform
-- Android TV / Fire TV app shell with foreground service and status UI
+- Android app with foreground receiver service and status UI; TV/Fire TV are the established build targets, with phone and tablet adaptation in progress
 - Multi-protocol receiver architecture: AirPlay 2 active, Google Cast and Miracast in development, plus UPnP/DLNA MediaRenderer planned as an additional option
 - Each protocol can be toggled on/off independently in Settings
-- Works on Google TV (Android 10+) and Fire TV (Android 7+)
+- Google TV build target: Android 10+; Fire TV build target: Android 7.1+
+- Android phones and tablets are an active compatibility goal; check the testing guide for devices actually validated
 - Miracast Wi-Fi Direct / WFD advertisement and RTSP control-plane
 - Google TV Cast Connect SDK lifecycle (full testing requires Cast app ID)
 - Zero ads and zero analytics; core AirPlay reception is LAN-local, while the optional weather widget uses internet
@@ -68,10 +71,11 @@ Miracast and Google Cast receiver stacks are in progress (control-plane implemen
 
 ## Requirements
 
-**On your TV:**
-- Google TV (Android 10+) or Amazon Fire TV (Android 7+)
-- Connected to the same Wi-Fi network as your Mac
-- Sideloading enabled (for Fire TV) or ADB enabled (for Google TV)
+**On your Android device:**
+- For the established TV targets: Google/Android TV (Android 10+) or Amazon Fire TV (Android 7.1+)
+- Phone and tablet builds are for development and device validation while compatibility work continues
+- Connected to the same Wi-Fi network as your Mac or iOS device
+- USB/network debugging or sideloading enabled to install development builds
 
 **On your Mac:**
 - macOS 12 (Monterey) or later
@@ -88,7 +92,7 @@ Miracast and Google Cast receiver stacks are in progress (control-plane implemen
 
 ### Option A: Download a Release APK (easiest)
 
-Go to the [Releases page](https://github.com/mazer666/PhairPlay/releases) and download the APK for your device:
+Go to this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) and download an APK for a listed target device:
 
 | APK | Device |
 |-----|--------|
@@ -107,13 +111,13 @@ Then install it via ADB (see the Sideloading Guide below) or a sideloading app l
 
 2. **Clone the repository**
    ```bash
-   git clone https://github.com/mazer666/PhairPlay.git
-   cd PhairPlay
+   git clone https://github.com/FredMuir/PhairPlay-desktop-clock.git
+   cd PhairPlay-desktop-clock
    ```
 
 3. **Build the APK**
    ```bash
-   # For Google TV:
+   # For Google TV / Android TV; can also be used for phone/tablet development validation:
    ./gradlew assembleGoogletvDebug
 
    # Google TV with a registered Cast App ID:
@@ -133,10 +137,10 @@ Then install it via ADB (see the Sideloading Guide below) or a sideloading app l
 
 4. **Install via ADB**
    ```bash
-   # Enable ADB on your TV first (see below)
-   adb connect <TV-IP-ADDRESS>
+   # Connect your Android device over USB or enable network ADB
+   adb devices
 
-   # Google TV:
+   # Google TV / Android TV (or a compatible Android phone/tablet for development validation):
    adb install app/build/outputs/apk/googletv/debug/app-googletv-debug.apk
 
    # Fire TV:
@@ -177,7 +181,7 @@ Then install it via ADB (see the Sideloading Guide below) or a sideloading app l
 
 ## How to Use
 
-1. Launch PhairPlay on your TV. You will see the Waiting Screen with your TV's name.
+1. Launch PhairPlay on the Android receiver. You will see the Waiting Screen with its device name.
 2. On your Mac, click the **AirPlay** icon in the menu bar (or go to **System Preferences → Displays → AirPlay Display**).
 3. Select your TV from the list (it should appear as your TV's name).
 4. Your Mac's screen will appear on the TV instantly.
@@ -203,7 +207,7 @@ For real-device failures, run `tools/collect-device-logs.sh` before restarting t
 
 ## Contributing
 
-Contributions are welcome! Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) before submitting a pull request.
+Contributions and device reports are welcome! Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) before opening an issue or pull request on this fork. This project is developed independently from the original repository.
 
 Key points:
 - Follow the coding rules in CONTRIBUTING.md (file size ≤400 lines soft / ≤550 lines hard max, class comments, test coverage)

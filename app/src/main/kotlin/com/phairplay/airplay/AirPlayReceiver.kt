@@ -264,7 +264,7 @@ class AirPlayReceiver(
     /** DNS-SD TXT wire bytes copied into updateInfo, matching the receiver's current mDNS record. */
     private fun buildAirPlayTxtRecord(): ByteArray {
         val fields = listOf(
-            "deviceid" to NetworkUtils.getMacAddress(),
+            "deviceid" to NetworkUtils.getMacAddress(context),
             "features" to deviceMode.featuresTxt,
             "model" to deviceMode.model,
             "srcvers" to deviceMode.sourceVersion,

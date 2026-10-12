@@ -211,6 +211,19 @@ class MainActivity : AppCompatActivity() {
         navItemNowPlaying = findViewById(R.id.nav_item_now_playing)
         contentContainer  = findViewById(R.id.content_container)
         streamingContainer = findViewById(R.id.streaming_container)
+
+        // The TV header has a brand label plus four navigation items. On narrow phone
+        // widths that row exceeds the available space and silently clips the last items.
+        // Keep the full TV treatment on tablets/TVs and reclaim that space on phones.
+        val widthDp = resources.configuration.screenWidthDp
+        if (widthDp < 600) {
+            findViewById<TextView>(R.id.nav_app_name).visibility = View.GONE
+            listOf(navItemHome, navItemSettings, navItemDevices, navItemNowPlaying).forEach {
+                val verticalPadding = it.paddingTop
+                val compactPadding = (8 * resources.displayMetrics.density).toInt()
+                it.setPaddingRelative(compactPadding, verticalPadding, compactPadding, it.paddingBottom)
+            }
+        }
     }
 
     /**

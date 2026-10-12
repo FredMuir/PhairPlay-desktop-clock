@@ -450,7 +450,7 @@ open class RtspHandler(
     /** GET /server-info — legacy XML plist of receiver identity for AirPlay video senders. */
     private fun handleServerInfo(request: RtspRequest): RtspResponse {
         val info = mapOf(
-            "deviceid" to com.phairplay.util.NetworkUtils.getMacAddress(),
+            "deviceid" to com.phairplay.util.NetworkUtils.getMacAddress(context),
             "features" to deviceMode.features,
             "model" to deviceMode.model,
             "protovers" to "1.1",

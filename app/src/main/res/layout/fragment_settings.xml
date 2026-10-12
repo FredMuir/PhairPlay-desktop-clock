@@ -41,10 +41,12 @@
         <LinearLayout
             android:id="@+id/row_display_name"
             android:layout_width="match_parent"
-            android:layout_height="72dp"
+            android:layout_height="wrap_content"
+            android:minHeight="72dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
             android:background="@drawable/settings_row_selector"
             android:focusable="true">
 
@@ -83,15 +85,17 @@
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_audio_screen_off"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <LinearLayout
             android:id="@+id/row_audio_screen_timeout"
             android:layout_width="match_parent"
-            android:layout_height="72dp"
+            android:layout_height="wrap_content"
+            android:minHeight="72dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
             android:background="@drawable/settings_row_selector"
             android:focusable="true">
             <TextView
@@ -111,21 +115,21 @@
 
         <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_clock" />
         <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_date" />
-        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_agenda" android:layout_width="match_parent" android:layout_height="72dp" />
-        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_weather" android:layout_width="match_parent" android:layout_height="72dp" />
-        <LinearLayout android:id="@+id/row_widget_style" android:layout_width="match_parent" android:layout_height="64dp"
-            android:gravity="center_vertical" android:paddingHorizontal="16dp" android:background="@drawable/settings_row_selector" android:focusable="true">
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_agenda" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_weather" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <LinearLayout android:id="@+id/row_widget_style" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp"
+            android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="10dp" android:background="@drawable/settings_row_selector" android:focusable="true">
             <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/setting_widget_style" android:textColor="@color/text_primary" android:textSize="18sp" />
             <TextView android:id="@+id/text_widget_style_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="16sp" />
         </LinearLayout>
-        <LinearLayout android:id="@+id/row_weather_city" android:layout_width="match_parent" android:layout_height="64dp"
-            android:gravity="center_vertical" android:paddingHorizontal="16dp" android:background="@drawable/settings_row_selector" android:focusable="true">
+        <LinearLayout android:id="@+id/row_weather_city" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp"
+            android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="10dp" android:background="@drawable/settings_row_selector" android:focusable="true">
             <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/setting_weather_city" android:textColor="@color/text_primary" android:textSize="18sp" />
             <TextView android:id="@+id/text_weather_city_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="16sp" />
         </LinearLayout>
-        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_keep_on" android:layout_width="match_parent" android:layout_height="72dp" />
-        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_dim" android:layout_width="match_parent" android:layout_height="72dp" />
-        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_seconds" android:layout_width="match_parent" android:layout_height="72dp" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_keep_on" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_dim" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_seconds" android:layout_width="match_parent" android:layout_height="wrap_content" />
 
         <!-- ── Section: Protocols ─────────────────────────────── -->
         <include layout="@layout/settings_section_header"
@@ -137,17 +141,17 @@
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_airplay"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_miracast"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_cast"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <!-- ── Section: AirPlay ───────────────────────────────── -->
         <include layout="@layout/settings_section_header"
@@ -159,15 +163,17 @@
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_mirror_audio"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <LinearLayout
             android:id="@+id/row_device_mode"
             android:layout_width="match_parent"
-            android:layout_height="72dp"
+            android:layout_height="wrap_content"
+            android:minHeight="72dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
             android:background="@drawable/settings_row_selector"
             android:focusable="true">
             <LinearLayout
@@ -241,7 +247,7 @@
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_pin_auth"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <!-- ── Section: Service ───────────────────────────────── -->
         <include layout="@layout/settings_section_header"
@@ -253,7 +259,7 @@
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_start_on_boot"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <!-- ── Section: Developer ─────────────────────────────── -->
         <include layout="@layout/settings_section_header"
@@ -265,7 +271,7 @@
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_debug_overlay"
             android:layout_width="match_parent"
-            android:layout_height="72dp" />
+            android:layout_height="wrap_content" />
 
         <!-- ── Section: About ─────────────────────────────────── -->
         <include layout="@layout/settings_section_header"
@@ -277,10 +283,12 @@
         <LinearLayout
             android:id="@+id/row_version"
             android:layout_width="match_parent"
-            android:layout_height="72dp"
+            android:layout_height="wrap_content"
+            android:minHeight="72dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
             android:background="@drawable/settings_row_selector"
             android:focusable="false">
 
@@ -303,10 +311,12 @@
         <LinearLayout
             android:id="@+id/row_reset"
             android:layout_width="match_parent"
-            android:layout_height="72dp"
+            android:layout_height="wrap_content"
+            android:minHeight="72dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
             android:background="@drawable/settings_row_selector"
             android:focusable="true">
 

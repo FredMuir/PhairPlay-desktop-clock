@@ -19,7 +19,7 @@ import java.util.UUID
  *
  * Example:
  *   val name = NetworkUtils.getDeviceName(context)   // "My Android TV"
- *   val mac  = NetworkUtils.getMacAddress()           // "aa:bb:cc:dd:ee:ff"
+ *   val mac  = NetworkUtils.getMacAddress(context)    // stable per-device AirPlay identity
  *   val uuid = NetworkUtils.getPersistentUuid(context) // stable UUID per device
  */
 object NetworkUtils {
@@ -66,24 +66,46 @@ object NetworkUtils {
      *
      * @return MAC address in "aa:bb:cc:dd:ee:ff" format (lowercase, colon-separated).
      */
-    fun getMacAddress(): String {
+    fun getMacAddress(context: Context? = null): String {
         return try {
-            // Iterate all network interfaces to find the Wi-Fi or Ethernet interface
+            // Prefer the active-looking Wi-Fi interface. Android commonly hides hardware
+            // addresses behind the 02:00:00:00:00:00 sentinel; that value is not a usable
+            // AirPlay identity and must not be published.
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: emptyList()
 
             val mac = interfaces
                 .filter { !it.isLoopback && it.isUp && it.hardwareAddress != null }
+                .sortedByDescending { it.name.startsWith("wlan", ignoreCase = true) }
                 .mapNotNull { iface ->
                     iface.hardwareAddress?.let { hwAddr ->
-                        hwAddr.joinToString(":") { byte -> "%02x".format(byte) }
+                        if (hwAddr.size != 6 || hwAddr.all { it == 0.toByte() } ||
+                            (hwAddr[0] == 0x02.toByte() && hwAddr.drop(1).all { it == 0.toByte() }) ||
+                            (hwAddr[0].toInt() and 1) != 0
+                        ) null else hwAddr.joinToString(":") { byte -> "%02x".format(byte) }
                     }
                 }
                 .firstOrNull()
 
-            mac ?: FALLBACK_MAC_ADDRESS
+            mac ?: context?.let(::getOrCreatePersistentAirPlayMac) ?: FALLBACK_MAC_ADDRESS
         } catch (e: Exception) {
             Timber.w(e, "Could not read MAC address — using fallback")
-            FALLBACK_MAC_ADDRESS
+            context?.let(::getOrCreatePersistentAirPlayMac) ?: FALLBACK_MAC_ADDRESS
+        }
+    }
+
+    /** A locally administered unicast address, unique and stable when Android hides the MAC. */
+    private fun getOrCreatePersistentAirPlayMac(context: Context): String {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.getString(PREF_KEY_DEVICE_MAC, null)?.let { return it }
+        synchronized(macLock) {
+            prefs.getString(PREF_KEY_DEVICE_MAC, null)?.let { return it }
+            val bytes = UUID.randomUUID().toString().replace("-", "")
+                .chunked(2).take(6).map { it.toInt(16).toByte() }.toByteArray()
+            // Set locally-administered and clear multicast bits, yielding a valid unicast MAC.
+            bytes[0] = ((bytes[0].toInt() and 0xFC) or 0x02).toByte()
+            val generated = bytes.joinToString(":") { "%02x".format(it) }
+            prefs.edit().putString(PREF_KEY_DEVICE_MAC, generated).apply()
+            return generated
         }
     }
 
@@ -127,4 +149,6 @@ object NetworkUtils {
     private const val FALLBACK_MAC_ADDRESS = "aa:bb:cc:dd:ee:ff"
     private const val PREFS_NAME = "phairplay_prefs"
     private const val PREF_KEY_DEVICE_UUID = "phairplay_device_uuid"
+    private const val PREF_KEY_DEVICE_MAC = "phairplay_device_mac"
+    private val macLock = Any()
 }

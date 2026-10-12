@@ -190,7 +190,13 @@ class NowPlayingScreen @JvmOverloads constructor(
         volumeColumn.addView(volumeCaption, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(22)))
         volumeColumn.addView(volumeLabel, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(22)))
         volumeColumn.addView(volumeTrack, LinearLayout.LayoutParams(dp(58), dp(250)))
-        widgets = textView(22f, R.color.text_secondary).apply { setPadding(0, dp(4), 0, dp(8)); maxLines = 3; gravity = Gravity.START }
+        widgets = textView(22f, R.color.text_secondary).apply {
+            setPadding(0, dp(4), 0, dp(8))
+            maxLines = Int.MAX_VALUE
+            movementMethod = ScrollingMovementMethod()
+            isVerticalScrollBarEnabled = true
+            gravity = Gravity.START
+        }
 
         details.addView(clockView)
         details.addView(widgets)
@@ -438,7 +444,8 @@ class NowPlayingScreen @JvmOverloads constructor(
             widgetsParams.weight = 0.36f
             widgetsParams.marginStart = dp(28)
             widgets.textSize = 24f
-            widgets.maxLines = 6
+            widgets.maxLines = Int.MAX_VALUE
+            widgets.maxHeight = dp(180)
             widgets.gravity = Gravity.START or Gravity.CENTER_VERTICAL
         } else {
             clockParams.width = LayoutParams.MATCH_PARENT
@@ -450,7 +457,8 @@ class NowPlayingScreen @JvmOverloads constructor(
             widgetsParams.weight = 0f
             widgetsParams.marginStart = 0
             widgets.textSize = 22f
-            widgets.maxLines = 3
+            widgets.maxLines = Int.MAX_VALUE
+            widgets.maxHeight = dp(240)
             widgets.gravity = Gravity.START
         }
         clockView.layoutParams = clockParams
