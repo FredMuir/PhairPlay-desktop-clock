@@ -9,9 +9,9 @@ Thank you for your interest in contributing to PhairPlay! This document explains
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally
 3. **Create a branch** for your change: `git checkout -b feature/your-feature-name`
-4. Make your changes following the coding rules below
-5. **Run tests**: `./gradlew test` (must pass)
-6. **Run lint**: `./gradlew lint` (no new errors)
+4. Make a focused change and update the relevant documentation
+5. Run the checks relevant to the change (see [Testing Guide](TESTING.md) and the repository CI workflow)
+6. Run the flavor-specific Android lint/build tasks when changing Android app code
 7. **Commit** with a clear message
 8. **Push** to your fork and **open a Pull Request**
 
@@ -29,11 +29,11 @@ Thank you for your interest in contributing to PhairPlay! This document explains
 
 These rules are enforced in code review. PRs that violate them will be asked to fix before merging.
 
-### RULE 1 — File Size
+### RULE 1 — Cohesion and File Size
 
-No Kotlin source file may exceed **400 lines**.
+There is no hard file-length gate. Several existing protocol and UI files are larger than 400 lines because they hold mature behavior with tightly related state.
 
-If you need more than 400 lines for a class, split it into smaller classes following the Single Responsibility Principle. Each class should do one thing and do it well.
+For new code, keep responsibilities cohesive and avoid adding unrelated behavior to large classes. Split a file when the new boundary makes state ownership, testing, or reuse clearer; avoid mechanical extraction during a protocol or timing fix.
 
 ```kotlin
 // BAD: One giant class doing everything
@@ -47,10 +47,7 @@ class VideoDecoder { ... }  // decodes H.264
 
 ### RULE 2 — Comments
 
-Every **class** must have a KDoc header comment explaining:
-- **WHAT** it does (1 sentence)
-- **WHY** it exists (1 sentence)
-- **HOW** to use it (short example)
+Document public APIs and non-obvious protocol, lifecycle, timing, security, or performance constraints. Explain why unusual behavior is required; do not add boilerplate to obvious code.
 
 ```kotlin
 /**
@@ -67,12 +64,7 @@ Every **class** must have a KDoc header comment explaining:
 class MdnsService(private val context: Context) {
 ```
 
-Every **non-trivial method** must have a comment explaining:
-- What it does (for callers)
-- Why it works the way it does (for future maintainers)
-- Any security or performance considerations
-
-**Don't** write obvious comments:
+**Avoid** comments that only repeat the code:
 ```kotlin
 // BAD: obvious
 // increment i by 1
@@ -85,14 +77,13 @@ i++
 
 ### RULE 3 — Tests
 
-Every **public method** must have at least one unit test.
-Every **AirPlay protocol step** must have a corresponding test.
+Add or update tests for meaningful behavior, especially protocol parsing, crypto boundaries, state transitions, and regression-prone timing logic. Not every public method needs a separate test. Choose the narrowest runner that covers the changed behavior; the actual CI gates are listed in [Testing Guide](TESTING.md).
 
 Test files must be named `[ClassName]Test.kt` and placed in the matching test directory:
 - Unit tests: `app/src/test/kotlin/com/phairplay/`
 - Instrumented tests: `app/src/androidTest/kotlin/com/phairplay/`
 
-Tests must be commented like production code. A fellow developer should understand what is being tested and why.
+Tests should make their intent clear through names and assertions. Add a short comment when a protocol invariant or edge case is not obvious.
 
 ```kotlin
 /**
@@ -140,12 +131,11 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
 Before submitting a PR, verify:
 
-- [ ] Code follows all 6 coding rules above
-- [ ] All public methods have unit tests
-- [ ] `./gradlew test` passes with 0 failures
-- [ ] `./gradlew lint` passes with no new errors
-- [ ] No file exceeds 400 lines
-- [ ] All classes have KDoc header comments
+- [ ] Code follows the focused-change, security, lifecycle, and performance guidance above
+- [ ] Relevant tests/checks pass, or the PR explains why a hardware/manual check is still needed
+- [ ] Relevant flavor lint and build tasks pass
+- [ ] User-visible strings and docs are updated
+- [ ] Device-only or timing-sensitive behavior is clearly marked with the evidence collected
 - [ ] PR description explains what changed and why
 
 ---

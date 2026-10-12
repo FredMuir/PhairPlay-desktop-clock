@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -106,6 +107,7 @@ class SettingsRepository(private val context: Context) {
      */
     private fun Preferences.toAppSettings(): AppSettings = AppSettings(
         displayName        = this[Keys.DISPLAY_NAME]            ?: "",
+        deviceMode         = AirPlayDeviceMode.fromStored(this[Keys.DEVICE_MODE]),
         airPlayEnabled     = this[Keys.AIRPLAY_ENABLED]         ?: true,
         miracastEnabled    = this[Keys.MIRACAST_ENABLED]        ?: true,
         castEnabled        = this[Keys.CAST_ENABLED]            ?: true,
@@ -113,7 +115,20 @@ class SettingsRepository(private val context: Context) {
         startOnBoot        = this[Keys.START_ON_BOOT]           ?: false,
         showDebugOverlay   = this[Keys.SHOW_DEBUG_OVERLAY]      ?: false,
         forceHighResolution = this[Keys.FORCE_HIGH_RESOLUTION]  ?: false,
-        mirrorAudioEnabled = this[Keys.MIRROR_AUDIO_ENABLED]    ?: true
+        mirrorAudioEnabled = this[Keys.MIRROR_AUDIO_ENABLED]    ?: true,
+        audioSyncOffsetMs = (this[Keys.AUDIO_SYNC_OFFSET_MS] ?: 0)
+            .coerceIn(-AppSettings.AUDIO_SYNC_OFFSET_LIMIT_MS, AppSettings.AUDIO_SYNC_OFFSET_LIMIT_MS),
+        audioScreenOffEnabled = this[Keys.AUDIO_SCREEN_OFF_ENABLED] ?: true,
+        audioScreenOffTimeoutMinutes = (this[Keys.AUDIO_SCREEN_OFF_TIMEOUT_MINUTES] ?: 1).coerceIn(1, 30),
+        nowPlayingClockEnabled = this[Keys.NP_CLOCK] ?: true,
+        nowPlayingDateEnabled = this[Keys.NP_DATE] ?: true,
+        nowPlayingAgendaEnabled = this[Keys.NP_AGENDA] ?: false,
+        nowPlayingWeatherEnabled = this[Keys.NP_WEATHER] ?: false,
+        nowPlayingWidgetStyle = this[Keys.NP_STYLE] ?: "MINIMAL",
+        weatherCity = this[Keys.WEATHER_CITY] ?: "",
+        bedsideClockKeepScreenOn = this[Keys.CLOCK_KEEP_ON] ?: true,
+        bedsideClockDimScreen = this[Keys.CLOCK_DIM_SCREEN] ?: true,
+        bedsideClockShowSeconds = this[Keys.CLOCK_SHOW_SECONDS] ?: false
     )
 
     /**
@@ -122,6 +137,7 @@ class SettingsRepository(private val context: Context) {
      */
     private fun MutablePreferences.fromAppSettings(settings: AppSettings) {
         this[Keys.DISPLAY_NAME]         = settings.displayName
+        this[Keys.DEVICE_MODE]          = settings.deviceMode.name
         this[Keys.AIRPLAY_ENABLED]      = settings.airPlayEnabled
         this[Keys.MIRACAST_ENABLED]     = settings.miracastEnabled
         this[Keys.CAST_ENABLED]         = settings.castEnabled
@@ -130,6 +146,18 @@ class SettingsRepository(private val context: Context) {
         this[Keys.SHOW_DEBUG_OVERLAY]   = settings.showDebugOverlay
         this[Keys.FORCE_HIGH_RESOLUTION] = settings.forceHighResolution
         this[Keys.MIRROR_AUDIO_ENABLED] = settings.mirrorAudioEnabled
+        this[Keys.AUDIO_SYNC_OFFSET_MS] = settings.audioSyncOffsetMs
+        this[Keys.AUDIO_SCREEN_OFF_ENABLED] = settings.audioScreenOffEnabled
+        this[Keys.AUDIO_SCREEN_OFF_TIMEOUT_MINUTES] = settings.audioScreenOffTimeoutMinutes.coerceIn(1, 30)
+        this[Keys.NP_CLOCK] = settings.nowPlayingClockEnabled
+        this[Keys.NP_DATE] = settings.nowPlayingDateEnabled
+        this[Keys.NP_AGENDA] = settings.nowPlayingAgendaEnabled
+        this[Keys.NP_WEATHER] = settings.nowPlayingWeatherEnabled
+        this[Keys.NP_STYLE] = settings.nowPlayingWidgetStyle
+        this[Keys.WEATHER_CITY] = settings.weatherCity
+        this[Keys.CLOCK_KEEP_ON] = settings.bedsideClockKeepScreenOn
+        this[Keys.CLOCK_DIM_SCREEN] = settings.bedsideClockDimScreen
+        this[Keys.CLOCK_SHOW_SECONDS] = settings.bedsideClockShowSeconds
     }
 
     /**
@@ -140,6 +168,7 @@ class SettingsRepository(private val context: Context) {
      */
     private object Keys {
         val DISPLAY_NAME        = stringPreferencesKey("display_name")
+        val DEVICE_MODE         = stringPreferencesKey("device_mode")
         val AIRPLAY_ENABLED     = booleanPreferencesKey("airplay_enabled")
         val MIRACAST_ENABLED    = booleanPreferencesKey("miracast_enabled")
         val CAST_ENABLED        = booleanPreferencesKey("cast_enabled")
@@ -148,5 +177,17 @@ class SettingsRepository(private val context: Context) {
         val SHOW_DEBUG_OVERLAY  = booleanPreferencesKey("show_debug_overlay")
         val FORCE_HIGH_RESOLUTION = booleanPreferencesKey("force_high_resolution")
         val MIRROR_AUDIO_ENABLED = booleanPreferencesKey("mirror_audio_enabled")
+        val AUDIO_SYNC_OFFSET_MS = intPreferencesKey("audio_sync_offset_ms")
+        val AUDIO_SCREEN_OFF_ENABLED = booleanPreferencesKey("audio_screen_off_enabled")
+        val AUDIO_SCREEN_OFF_TIMEOUT_MINUTES = intPreferencesKey("audio_screen_off_timeout_minutes")
+        val NP_CLOCK = booleanPreferencesKey("now_playing_clock")
+        val NP_DATE = booleanPreferencesKey("now_playing_date")
+        val NP_AGENDA = booleanPreferencesKey("now_playing_agenda")
+        val NP_WEATHER = booleanPreferencesKey("now_playing_weather")
+        val NP_STYLE = stringPreferencesKey("now_playing_widget_style")
+        val WEATHER_CITY = stringPreferencesKey("weather_city")
+        val CLOCK_KEEP_ON = booleanPreferencesKey("bedside_clock_keep_screen_on")
+        val CLOCK_DIM_SCREEN = booleanPreferencesKey("bedside_clock_dim_screen")
+        val CLOCK_SHOW_SECONDS = booleanPreferencesKey("bedside_clock_show_seconds")
     }
 }

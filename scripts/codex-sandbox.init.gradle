@@ -1,0 +1,19 @@
+import org.gradle.api.tasks.compile.JavaCompile
+
+def sandboxBuildRoot = gradle.startParameter.projectProperties['phairplay.sandbox.buildDir']
+def sandboxJavac = gradle.startParameter.projectProperties['phairplay.sandbox.javac']
+
+if (!sandboxBuildRoot) {
+    throw new GradleException('Pass -Pphairplay.sandbox.buildDir=<writable build output directory>')
+}
+if (!sandboxJavac) {
+    throw new GradleException('Pass -Pphairplay.sandbox.javac=<JDK 25 javac executable>')
+}
+
+gradle.beforeProject { project ->
+    project.layout.buildDirectory.set(new File(sandboxBuildRoot, project.name))
+    project.tasks.withType(JavaCompile).configureEach {
+        options.fork = true
+        options.forkOptions.executable = sandboxJavac
+    }
+}

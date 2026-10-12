@@ -45,7 +45,7 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
-            android:background="@drawable/focus_ring_selector"
+            android:background="@drawable/settings_row_selector"
             android:focusable="true">
 
             <LinearLayout
@@ -80,6 +80,53 @@
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_force_high_res" />
 
+        <include layout="@layout/settings_toggle_row"
+            android:id="@+id/row_audio_screen_off"
+            android:layout_width="match_parent"
+            android:layout_height="72dp" />
+
+        <LinearLayout
+            android:id="@+id/row_audio_screen_timeout"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:background="@drawable/settings_row_selector"
+            android:focusable="true">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/setting_audio_screen_timeout"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+            <TextView
+                android:id="@+id/text_audio_screen_timeout_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_clock" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_date" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_agenda" android:layout_width="match_parent" android:layout_height="72dp" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_widget_weather" android:layout_width="match_parent" android:layout_height="72dp" />
+        <LinearLayout android:id="@+id/row_widget_style" android:layout_width="match_parent" android:layout_height="64dp"
+            android:gravity="center_vertical" android:paddingHorizontal="16dp" android:background="@drawable/settings_row_selector" android:focusable="true">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/setting_widget_style" android:textColor="@color/text_primary" android:textSize="18sp" />
+            <TextView android:id="@+id/text_widget_style_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="16sp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/row_weather_city" android:layout_width="match_parent" android:layout_height="64dp"
+            android:gravity="center_vertical" android:paddingHorizontal="16dp" android:background="@drawable/settings_row_selector" android:focusable="true">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/setting_weather_city" android:textColor="@color/text_primary" android:textSize="18sp" />
+            <TextView android:id="@+id/text_weather_city_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="16sp" />
+        </LinearLayout>
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_keep_on" android:layout_width="match_parent" android:layout_height="72dp" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_dim" android:layout_width="match_parent" android:layout_height="72dp" />
+        <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_seconds" android:layout_width="match_parent" android:layout_height="72dp" />
+
         <!-- ── Section: Protocols ─────────────────────────────── -->
         <include layout="@layout/settings_section_header"
             android:id="@+id/header_protocols"
@@ -113,6 +160,83 @@
             android:id="@+id/row_mirror_audio"
             android:layout_width="match_parent"
             android:layout_height="72dp" />
+
+        <LinearLayout
+            android:id="@+id/row_device_mode"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:background="@drawable/settings_row_selector"
+            android:focusable="true">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_device_mode"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp" />
+                <TextView
+                    android:id="@+id/text_device_mode_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_chevron_right"
+                android:importantForAccessibility="no" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/row_audio_sync"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="112dp"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
+            android:background="@drawable/settings_row_selector">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/setting_audio_sync"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp" />
+                <TextView
+                    android:id="@+id/text_audio_sync_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp" />
+            </LinearLayout>
+            <SeekBar
+                android:id="@+id/seek_audio_sync"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="500"
+                android:contentDescription="@string/setting_audio_sync" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/setting_audio_sync_subtitle"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
 
         <include layout="@layout/settings_toggle_row"
             android:id="@+id/row_pin_auth"
@@ -157,7 +281,7 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
-            android:background="@drawable/focus_ring_selector"
+            android:background="@drawable/settings_row_selector"
             android:focusable="false">
 
             <TextView
@@ -183,7 +307,7 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="16dp"
-            android:background="@drawable/focus_ring_selector"
+            android:background="@drawable/settings_row_selector"
             android:focusable="true">
 
             <TextView

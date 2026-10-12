@@ -35,10 +35,15 @@ object PlistCodec {
      * @throws IllegalArgumentException if the root element is not a dictionary.
      */
     fun decode(bytes: ByteArray): Map<String, Any?> {
+        return decodeAny(bytes) as? Map<String, Any?>
+            ?: throw IllegalArgumentException("plist root is not a dictionary")
+    }
+
+    /** Decodes any plist root, including the root array used by SETPEERS. */
+    fun decodeAny(bytes: ByteArray): Any? {
         val root = PropertyListParser.parse(bytes)
         @Suppress("UNCHECKED_CAST")
-        return (fromNs(root) as? Map<String, Any?>)
-            ?: throw IllegalArgumentException("plist root is not a dictionary")
+        return fromNs(root)
     }
 
     private fun toNs(value: Any?): NSObject = when (value) {

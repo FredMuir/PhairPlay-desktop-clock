@@ -28,8 +28,10 @@ android {
         // applicationId is overridden per flavor below
         minSdk = 25           // Lowest common denominator (Fire TV)
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.0-beta.2"
+        // Keep versionCode monotonic for Android upgrades; bump versionName with each
+        // user-visible device-validation build so installed APKs are easy to identify.
+        versionCode = 43
+        versionName = "1.0.40-tbj607f"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "CAST_APP_ID", "\"${castAppId.escapedForBuildConfig()}\"")
@@ -56,7 +58,7 @@ android {
     productFlavors {
         create("googletv") {
             dimension = "platform"
-            applicationId = "com.phairplay.googletv"
+            applicationId = "cn.codex.tbj607f.airplay"
             minSdk = 29        // Google TV requires Android 10+
             versionNameSuffix = "-googletv"
         }

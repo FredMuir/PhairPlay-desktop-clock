@@ -1,6 +1,7 @@
 package com.phairplay.airplay
 
 import com.phairplay.airplay.handshake.FairPlay
+import com.phairplay.airplay.handshake.HapControlCrypto
 import com.phairplay.airplay.handshake.InfoResponder
 import com.phairplay.airplay.handshake.PairingKeys
 import com.phairplay.airplay.handshake.PairingSession
@@ -23,6 +24,7 @@ import java.net.Socket
  */
 open class RtspHandler(
     private val context: android.content.Context,
+    private val deviceMode: com.phairplay.settings.AirPlayDeviceMode = com.phairplay.settings.AirPlayDeviceMode.HOMEPOD,
     private val displayWidth: Int = 1920,
     private val displayHeight: Int = 1080,
     private val audioEnabled: Boolean = false,
@@ -48,11 +50,17 @@ open class RtspHandler(
     /** AirPlay 2 mirror TEARDOWN of just the video stream (type 110) — stop video, keep audio. */
     private val onMirrorVideoStop: () -> Unit = {},
     /** AirPlay 2 buffered audio-only SETUP (type 103, Apple Music → TV); returns the TCP data port. */
-    private val onBufferedAudioStart: () -> Int = { 0 },
+    private val onBufferedAudioStart: (sessionKey: ByteArray, audioFormat: Long, samplesPerFrame: Int) -> Int = { _, _, _ -> 0 },
+    /** Buffered-audio transport command. Timing fields are retained for PTP-scheduled output. */
+    private val onBufferedAudioRate: (Map<String, Any?>) -> Unit = {},
+    /** PTP peers announced by the sender in SETPEERS/SETPEERSX. */
+    private val onPtpPeers: (peers: List<String>, localAddress: java.net.InetAddress?) -> Unit = { _, _ -> },
     /** Stops the buffered audio-only stream (type 103 TEARDOWN). */
     private val onBufferedAudioStop: () -> Unit = {},
     /** Sender volume change (AirPlay dB: −30…0, or ≤ −144 = mute) via SET_PARAMETER. */
     private val onVolume: (Float) -> Unit = {},
+    /** Current receiver volume, including Android hardware-volume changes. */
+    private val currentOutputVolumeDb: () -> Float = { 0f },
     /** Now-playing track metadata (DMAP) from SET_PARAMETER — any field may be null. */
     private val onNowPlayingMetadata: (title: String?, artist: String?, album: String?) -> Unit = { _, _, _ -> },
     /** Album artwork (JPEG/PNG bytes) from SET_PARAMETER; empty bytes = artwork cleared. */
@@ -74,7 +82,9 @@ open class RtspHandler(
     /** Persistent store of paired controllers' Ed25519 keys (for pair-verify). */
     private val pairingStore: com.phairplay.airplay.handshake.PairingStore? = null,
     /** Shows ([pin]) or hides (null) the on-screen pairing PIN during SRP pair-setup. */
-    private val onShowPin: (pin: String?) -> Unit = {}
+    private val onShowPin: (pin: String?) -> Unit = {},
+    /** Opens an encrypted AirPlay event channel for transient-paired audio-only sessions. */
+    private val onTransientEventSetup: (secret: ByteArray, remoteAddress: java.net.InetAddress) -> Int = { _, _ -> 0 }
 ) {
 
     // ─── Legacy AirPlay SRP PIN pairing (only used when pinAuthEnabled) ───────
@@ -83,9 +93,6 @@ open class RtspHandler(
     // pair-verify — which is what makes macOS fall back to the /pair-pin-start + /pair-setup-pin PIN
     // flow (an accepted pair-verify means "already trusted, no PIN needed").
     @Volatile private var pinPaired = false
-
-    /** Last volume the sender set (AirPlay dB); returned to GET_PARAMETER volume queries. */
-    @Volatile private var currentVolume: Float = 0f
 
     private var serverSocket: ServerSocket? = null
 
@@ -121,6 +128,7 @@ open class RtspHandler(
     protected val activeStreamTypes = mutableSetOf<Int>()
 
     private var setupCount = 0
+    @Volatile private var transientEventPort = 0
 
     private val requestReader = RtspRequestReader(
         maxMessageBytes = MAX_MESSAGE_BYTES,
@@ -217,10 +225,13 @@ open class RtspHandler(
     private fun handleClient(socket: Socket) {
         val inputStream = socket.getInputStream()
         val outputStream = socket.getOutputStream()
+        var hapControl: HapControlCrypto? = null
+        var activeInput: java.io.InputStream = inputStream
 
         // Fresh pairing + FairPlay state for each control connection.
         pairingSession = PairingSession(PairingKeys.get(context))
         fairPlay = FairPlay()
+        transientEventPort = 0
         // NOTE: legacyPin and pinPaired are deliberately NOT reset here. macOS runs the PIN handshake
         // across SEPARATE TCP connections (/pair-pin-start on one, /pair-setup-pin on the next), so the
         // PIN/verifier and the "paired" flag must survive a reconnect. They live for the receiver's
@@ -229,10 +240,18 @@ open class RtspHandler(
 
         try {
             while (running && !socket.isClosed) {
-                val request = requestReader.read(inputStream) ?: break
-                currentCSeq = request.headers["CSeq"]?.toIntOrNull() ?: 0
+                val request = requestReader.read(activeInput) ?: break
+                currentCSeq = request.headers.header("CSeq")?.toIntOrNull() ?: 0
                 val response = routeRequest(request)
-                sendResponse(outputStream, response)
+                sendResponse(outputStream, response, hapControl)
+                val transientSecret = pairingSession?.takeTransientControlSecret()
+                if (transientSecret != null && hapControl == null) {
+                    hapControl = HapControlCrypto(transientSecret)
+                    activeInput = hapControl!!.wrapInput(inputStream)
+                    transientEventPort = onTransientEventSetup(transientSecret, socket.inetAddress)
+                    if (transientEventPort > 0) Logger.i("Transient audio event channel ready on port $transientEventPort")
+                    Logger.i("HKP 4 transient pairing complete; encrypted RTSP control enabled")
+                }
 
                 // After RECORD on a legacy SDP session: a session WITH video switches to interleaved
                 // RTP (video arrives $-framed over this TCP socket). An audio-only session (e.g. Apple
@@ -262,6 +281,7 @@ open class RtspHandler(
             if (running) Logger.e("Error handling RTSP client", e)
         } finally {
             Logger.i("Client disconnected")
+            onRemoteControlInfo(null, null)
             socket.close()
             activeClient = null
             currentSession = null
@@ -270,6 +290,7 @@ open class RtspHandler(
             isMirrorSession = false
             activeStreamTypes.clear()
             setupCount = 0
+            transientEventPort = 0
             onStreamingStopped()
         }
     }
@@ -278,7 +299,11 @@ open class RtspHandler(
         Logger.d("RTSP ${request.method} ${request.uri}")
         // Senders attach their DACP reverse-control identity to most requests — capture it so the TV
         // remote can drive playback (DacpClient dedups, so this is cheap to call repeatedly).
-        request.headers["Active-Remote"]?.let { onRemoteControlInfo(request.headers["DACP-ID"], it) }
+        val activeRemote = request.headers.header("Active-Remote")
+        val dacpId = request.headers.header("DACP-ID")
+        if (activeRemote != null) onRemoteControlInfo(dacpId, activeRemote)
+        else if (dacpId != null) Logger.i("RTSP sender advertised DACP-ID but omitted Active-Remote")
+        if (request.method == "TEARDOWN") onRemoteControlInfo(null, null)
         return when (request.method) {
             "OPTIONS"       -> handleOptionsInternal(request)
             "ANNOUNCE"      -> handleAnnounceInternal(request)
@@ -426,10 +451,10 @@ open class RtspHandler(
     private fun handleServerInfo(request: RtspRequest): RtspResponse {
         val info = mapOf(
             "deviceid" to com.phairplay.util.NetworkUtils.getMacAddress(),
-            "features" to 0x1E5A7FFFF7L,
-            "model" to "AppleTV5,3",
+            "features" to deviceMode.features,
+            "model" to deviceMode.model,
             "protovers" to "1.1",
-            "srcvers" to "220.68",
+            "srcvers" to deviceMode.sourceVersion,
         )
         return RtspResponse(
             200, "OK",
@@ -467,10 +492,28 @@ open class RtspHandler(
         val n = request.bodyBytes.size
         if (n > 0) {
             runCatching {
-                val p = PlistCodec.decode(request.bodyBytes)
+                val decoded = PlistCodec.decodeAny(request.bodyBytes)
+                val p = decoded as? Map<String, Any?> ?: emptyMap()
                 Logger.d("$label body ($n B): " + p.entries.joinToString { (k, v) ->
                     "$k=" + when (v) { is ByteArray -> "${v.size}B"; is List<*> -> "list[${v.size}]"; else -> v.toString() }
-                })
+                }.ifEmpty { "root=${decoded?.javaClass?.simpleName ?: "null"}" })
+                if (label == "SETRATEANCHORTIME") onBufferedAudioRate(p)
+                if (label == "SETPEERS" || label == "SETPEERSX") {
+                    val peers = when (decoded) {
+                        is List<*> -> decoded.flatMap { peer ->
+                            when (peer) {
+                                is String -> listOf(peer)
+                                is Map<*, *> -> (peer["Addresses"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+                                else -> emptyList()
+                            }
+                        }
+                        is Map<*, *> -> (decoded["peers"] as? List<*>)?.filterIsInstance<String>()
+                            ?: (decoded["Addresses"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+                        else -> emptyList()
+                    }
+                    Logger.i("PTP peer list received (${peers.size} addresses)")
+                    if (peers.isNotEmpty()) onPtpPeers(peers, activeClient?.localAddress)
+                }
             }.onFailure { Logger.d("$label body ($n B, non-plist)") }
         }
         return RtspResponse(200, "OK", protocol = request.responseProtocol())
@@ -480,7 +523,7 @@ open class RtspHandler(
     private fun handleInfo(request: RtspRequest): RtspResponse = RtspResponse(
         statusCode = 200,
         statusMessage = "OK",
-        bodyBytes = InfoResponder.build(context, displayWidth, displayHeight, pinRequired = pinAuthEnabled),
+        bodyBytes = InfoResponder.build(context, displayWidth, displayHeight, pinRequired = pinAuthEnabled, deviceMode = deviceMode),
         contentType = "application/x-apple-binary-plist",
         protocol = request.responseProtocol()
     )
@@ -491,15 +534,40 @@ open class RtspHandler(
      * user types on the Mac — so only someone with screen access can pair.
      */
     private fun handlePairSetup(request: RtspRequest): RtspResponse {
+        val hkp = request.headers.entries.firstOrNull { it.key.equals("X-Apple-HKP", ignoreCase = true) }?.value ?: "missing"
+        val contentType = request.headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value ?: "missing"
+        Logger.i("pair-setup request: HKP=$hkp, contentType=$contentType, bodyBytes=${request.bodyBytes.size}, tlv=${tlvShape(request.bodyBytes)}")
+        // HKP 4 uses a fixed transient SRP code, not the PIN displayed by this receiver.
+        // Do not let that alternate pairing route establish event-channel credentials when the
+        // user has explicitly enabled PIN access control.
+        if (pinAuthEnabled && hkp == "4") {
+            Logger.w("HKP 4 transient pair-setup rejected — PIN pairing required")
+            return RtspResponse(470, "Connection Authorization Required", protocol = request.responseProtocol())
+        }
         // /pair-setup is the anonymous key exchange; PIN access control runs on /pair-setup-pin.
         return try {
-            val body = pairingSession!!.pairSetup(request.bodyBytes)
-            Logger.i("pair-setup OK (returned ${body.size}-byte public key)")
-            RtspResponse(200, "OK", bodyBytes = body, contentType = OCTET_STREAM, protocol = request.responseProtocol())
+            val body = pairingSession!!.pairSetup(request.bodyBytes, hkp)
+            Logger.i("pair-setup OK (returned ${body.size}-byte response)")
+            RtspResponse(200, "OK", bodyBytes = body, contentType = if (hkp == "4") "application/x-apple-binary-plist" else OCTET_STREAM, protocol = request.responseProtocol())
         } catch (e: Exception) {
             Logger.e("pair-setup failed", e)
             RtspResponse(400, "Bad Request", protocol = request.responseProtocol())
         }
+    }
+
+    /** Log TLV8 tag/length metadata only; never log pairing public keys, proofs, or encrypted data. */
+    private fun tlvShape(bytes: ByteArray): String {
+        val items = mutableListOf<String>()
+        var offset = 0
+        while (offset + 2 <= bytes.size) {
+            val tag = bytes[offset].toInt() and 0xff
+            val length = bytes[offset + 1].toInt() and 0xff
+            if (offset + 2 + length > bytes.size) return items.joinToString(",") + ",malformed"
+            items += "$tag:$length"
+            offset += 2 + length
+        }
+        if (offset != bytes.size) items += "trailing"
+        return items.joinToString(",")
     }
 
     /**
@@ -670,9 +738,7 @@ open class RtspHandler(
                         mapOf("type" to 96L, "dataPort" to dataPort.toLong(), "controlPort" to controlPort.toLong())
                     }
                     103 -> {
-                        // Buffered (audio-only) AirPlay 2 — accepted + instrumented, but the macOS
-                        // Music stream stays FairPlay-encrypted (undecryptable), so playback is not
-                        // wired. Stream fields (codec ct, audioFormat, shk/shiv, latencies) logged for ref.
+                        // Buffered AirPlay 2 carries a per-stream key (`shk`) and audio format.
                         Logger.d("buffered audio stream type=103 dict: " + stream.entries.joinToString { (k, v) ->
                             "$k=" + when (v) { is ByteArray -> "${v.size}B"; is List<*> -> "list[${v.size}]"; else -> v.toString() }
                         })
@@ -680,10 +746,18 @@ open class RtspHandler(
                             Logger.i("buffered audio (type=103) ignored (audio disabled in settings)")
                             return@mapNotNull null
                         }
-                        val dataPort = onBufferedAudioStart()
+                        val sessionKey = stream["shk"] as? ByteArray
+                        if (sessionKey == null || sessionKey.size != 32) {
+                            Logger.e("buffered audio setup missing 32-byte session key")
+                            return@mapNotNull null
+                        }
+                        val audioFormat = (stream["audioFormat"] as? Long) ?: 4_194_304L
+                        val spf = (stream["spf"] as? Long)?.toInt() ?: 1024
+                        val dataPort = onBufferedAudioStart(sessionKey, audioFormat, spf)
                         activeStreamTypes.add(103)
-                        Logger.i("buffered audio stream type=103 dataPort=$dataPort")
-                        mapOf("type" to 103L, "dataPort" to dataPort.toLong())
+                        Logger.i("buffered audio stream type=103 format=$audioFormat spf=$spf dataPort=$dataPort")
+                        if (transientEventPort > 0) response["eventPort"] = transientEventPort.toLong()
+                        mapOf("type" to 103L, "dataPort" to dataPort.toLong(), "audioBufferSize" to 32768L)
                     }
                     else -> {
                         Logger.i("mirror SETUP stream dict: " + stream.entries.joinToString { (k, v) ->
@@ -728,7 +802,7 @@ open class RtspHandler(
             return RtspResponse(statusCode = 400, statusMessage = "Bad Request")
         }
 
-        currentSession = parsed.copy(senderName = extractSenderName(request.headers["User-Agent"]))
+        currentSession = parsed.copy(senderName = extractSenderName(request.headers.header("User-Agent")))
         val s = currentSession!!
         Logger.i("Session: hasVideo=${s.hasVideo} hasAudio=${s.hasAudio} " +
                  "codec=${s.audioCodec} encrypted=${s.isAudioEncrypted} sender='${s.senderName}'")
@@ -849,7 +923,7 @@ open class RtspHandler(
         return if (query.startsWith("volume")) {
             RtspResponse(
                 statusCode = 200, statusMessage = "OK",
-                body = "volume: %.6f\r\n".format(currentVolume),
+                body = "volume: %.6f\r\n".format(currentOutputVolumeDb().coerceIn(-144f, 0f)),
                 contentType = "text/parameters",
                 protocol = request.responseProtocol()
             )
@@ -860,18 +934,22 @@ open class RtspHandler(
 
     private fun handleSetParameter(request: RtspRequest): RtspResponse {
         val body = request.body
-        val contentType = request.headers["Content-Type"]?.lowercase() ?: ""
+        val contentType = request.headers.header("Content-Type")?.lowercase() ?: ""
         // Text bodies carry "volume: <dB>"; binary bodies carry DMAP now-playing metadata or artwork.
+        // iOS can bundle volume with progress in one text/parameters body, so search each line.
+        val volume = body.lineSequence().mapNotNull { line ->
+            if (line.substringBefore(':').trim().equals("volume", ignoreCase = true)) {
+                line.substringAfter(':', "").trim().toFloatOrNull()
+            } else null
+        }.firstOrNull()
         when {
-            body.startsWith("volume") -> {
-                body.substringAfter(":").trim().toFloatOrNull()?.let { v ->
-                    currentVolume = v
-                    onVolume(v)
-                    Logger.d("SET_PARAMETER volume=$v")
-                }
+            volume != null -> {
+                onVolume(volume)
+                Logger.i("SET_PARAMETER volume=$volume dB")
             }
             contentType.startsWith("image/") -> {
-                // Album artwork (image/jpeg, image/png). A zero-length body clears it.
+                // Album artwork (image/jpeg, image/png). Empty image/none is commonly a
+                // placeholder before a repeated artwork payload, so preserve current art.
                 onArtwork(request.bodyBytes)
                 Logger.i("SET_PARAMETER artwork (${request.bodyBytes.size}B, $contentType)")
             }
@@ -879,6 +957,11 @@ open class RtspHandler(
                 val meta = DmapParser.parseNowPlaying(request.bodyBytes)
                 onNowPlayingMetadata(meta.title, meta.artist, meta.album)
                 Logger.i("SET_PARAMETER now-playing: title='${meta.title}' artist='${meta.artist}' album='${meta.album}'")
+            }
+            contentType.startsWith("text/parameters") -> {
+                val fields = body.lineSequence().map { it.substringBefore(':').trim() }
+                    .filter { it.isNotEmpty() }.joinToString(",")
+                Logger.i("SET_PARAMETER parameters fields=$fields")
             }
             else -> Logger.d("SET_PARAMETER (${request.bodyBytes.size}B, $contentType, unhandled)")
         }
@@ -914,7 +997,7 @@ open class RtspHandler(
 
         return when (val validation = PhotoHandler.validatePhoto(
             request.bodyBytes,
-            request.headers["Content-Type"]
+            request.headers.header("Content-Type")
         )) {
             is PhotoValidation.Valid -> {
                 onPhotoReceived(request.bodyBytes, validation.imageType)
@@ -951,7 +1034,7 @@ open class RtspHandler(
         )
     }
 
-    private fun sendResponse(outputStream: OutputStream, response: RtspResponse) {
+    private fun sendResponse(outputStream: OutputStream, response: RtspResponse, hapControl: HapControlCrypto? = null) {
         // Binary-safe: build the header block as ASCII, then write the raw body bytes.
         // Content-Length must be the BYTE length (not String.length) so binary plists,
         // FairPlay payloads, and encrypted bodies are framed correctly.
@@ -970,11 +1053,11 @@ open class RtspHandler(
             head.append("Content-Length: ${wire.size}\r\n")
         }
         head.append("\r\n")
-        outputStream.write(head.toString().toByteArray(Charsets.US_ASCII))
-        if (wire.isNotEmpty()) {
-            outputStream.write(wire)
+        val responseBytes = head.toString().toByteArray(Charsets.US_ASCII) + wire
+        if (hapControl != null) hapControl.write(outputStream, responseBytes) else {
+            outputStream.write(responseBytes)
+            outputStream.flush()
         }
-        outputStream.flush()
     }
 
     private fun sendServiceUnavailable(socket: Socket) {

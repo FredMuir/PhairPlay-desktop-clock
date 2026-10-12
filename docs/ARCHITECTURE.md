@@ -101,7 +101,7 @@ When you stop screen sharing, the Mac sends a "goodbye" message (RTSP TEARDOWN) 
 |---|---|---|
 | `AudioStreamServer` | `airplay/handshake/AudioStreamServer.kt` | Mirror audio (type 96): UDP RTP, AES-128-CBC, AAC-ELD/LC, retransmit |
 | `AlacDecoder` | `airplay/handshake/AlacDecoder.kt` | RAOP/SDP audio: AES-128-CBC + Apple ALAC; mute-on-bad-key guard |
-| `BufferedAudioServer` | `airplay/handshake/BufferedAudioServer.kt` | AirPlay 2 buffered audio (type 103) — accepted, not yet played |
+| `BufferedAudioServer` | `airplay/handshake/BufferedAudioServer.kt` | AirPlay 2 buffered audio (type 103): TCP receive, ChaCha20-Poly1305 decrypt, AAC-LC decode, PTP/RTP anchor scheduling, AudioTrack output and position servo |
 | `AudioPlayer` | `airplay/AudioPlayer.kt` | Low-level AudioTrack wrapper |
 | `alac/` | `cpp/alac/` | Apple ALAC decoder (C++) + JNI bridge |
 | `AirPlayNtpClient` | `airplay/handshake/AirPlayNtpClient.kt` | Apple NTP for A/V synchronisation |

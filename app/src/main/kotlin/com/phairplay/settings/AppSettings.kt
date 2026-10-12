@@ -21,6 +21,9 @@ package com.phairplay.settings
  */
 data class AppSettings(
 
+    /** Device identity advertised to AirPlay senders. */
+    val deviceMode: AirPlayDeviceMode = AirPlayDeviceMode.HOMEPOD,
+
     // ─── Display ───────────────────────────────────────────────────────────
     /**
      * The name shown in sender pickers (AirPlay menu on Mac, Cast picker in Chrome, etc.).
@@ -89,7 +92,23 @@ data class AppSettings(
      * the whole mirror session down after a couple of seconds — so this defaults OFF to keep video
      * mirroring rock-solid. Turn on to experiment with audio.
      */
-    val mirrorAudioEnabled: Boolean = true
+    val mirrorAudioEnabled: Boolean = true,
+
+    /** Signed local audio output compensation in milliseconds; negative starts earlier. */
+    val audioSyncOffsetMs: Int = 0,
+
+    /** Let the display sleep during audio-only AirPlay after this much user inactivity. */
+    val audioScreenOffEnabled: Boolean = true,
+    val audioScreenOffTimeoutMinutes: Int = 1,
+    val nowPlayingClockEnabled: Boolean = true,
+    val nowPlayingDateEnabled: Boolean = true,
+    val nowPlayingAgendaEnabled: Boolean = false,
+    val nowPlayingWeatherEnabled: Boolean = false,
+    val nowPlayingWidgetStyle: String = "MINIMAL",
+    val weatherCity: String = "",
+    val bedsideClockKeepScreenOn: Boolean = true,
+    val bedsideClockDimScreen: Boolean = true,
+    val bedsideClockShowSeconds: Boolean = false
 ) {
 
     /** Advertised mirroring display size: 2560×1440 when [forceHighResolution], else 1920×1080. */
@@ -117,5 +136,20 @@ data class AppSettings(
 
         /** Maximum allowed length for the display name (mDNS limit). */
         const val DISPLAY_NAME_MAX_LENGTH = 63
+        const val AUDIO_SYNC_OFFSET_LIMIT_MS = 250
+    }
+}
+
+enum class AirPlayDeviceMode(val model: String, val displayLabel: String, val features: Long, val sourceVersion: String) {
+    // Profile values observed from the two HomePod mini emulators on the user's LAN.
+    HOMEPOD("AudioAccessory5,1", "HomePod mini", 0x1C340405C4A00L, "377.40.00"),
+    APPLE_TV("AppleTV5,3", "Apple TV", 0x1E5A7FFFF7L, "220.68");
+
+    val featuresTxt: String
+        get() = "0x${(features and 0xffffffffL).toString(16).uppercase()},0x${(features ushr 32).toString(16).uppercase()}"
+
+    companion object {
+        fun fromStored(value: String?): AirPlayDeviceMode =
+            entries.firstOrNull { it.name == value } ?: HOMEPOD
     }
 }

@@ -7,6 +7,401 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- Reduce AirPlay multi-room join lag by waiting for advancing `AudioTrack` timestamps before applying phase feedback, then skipping up to one second of already-late startup audio in a bounded phase correction. Small residual errors still use the existing servo.
+- Keep the PCM converter's rate clamp aligned with the temporary catch-up limit.
+
+### Documentation
+- Add a portable Chinese maintenance playbook covering build, validation, and AirPlay troubleshooting practices.
+- Align contributor and testing guidance with the project's CI tasks and documented validation scope.
+
+## [1.0.38-tbj607f] - 2026-10-12
+
+> Development build created as `googletvDebug`; installation and post-fix playback validation were not completed.
+
+### Changed
+- Keep the documented receiver defaults when settings have never been saved, and advertise/enforce PIN protection consistently when enabled.
+- On large song-start phase error, wait for two advancing AudioTrack timestamps and skip up to one second of already-late source audio once; retain feedback correction for any residual error.
+
+### Validation
+- `assembleGoogletvDebug` succeeded. The candidate uses `versionCode 41` and `minSdk 29`.
+- The candidate's debug signing key did not match the key on the reference installation, so it was not installed and post-fix playback was not validated.
+- The startup diagnosis was based on previously captured device logs; no new playback session was started for this build.
+- Increased Android `versionCode` to 41.
+
+## [1.0.37-tbj607f] - 2026-10-11
+
+> Development build; device installation and runtime validation were not completed.
+
+### Fixed
+- Preserve the documented default of enabling all three receiver protocols when a preference has not been saved; explicit user choices remain unchanged.
+- When PIN authentication is enabled, advertise `pw=true` and the `PINRequired` status bit in AirPlay discovery, and reject HKP 4 transient pairing because it uses a fixed code instead of the PIN shown on screen.
+
+### Validation
+- The build did not complete: Kotlin compilation passed, then Java compilation hit a local Gradle cache JAR access error. No APK matching this source/version was produced.
+- `:test-runner:test` could not start because required test dependencies were unavailable in the offline build environment.
+- Protocol playback, UI behavior, and multi-room synchronization remain unverified.
+- Increased Android `versionCode` to 40.
+
+## [1.0.36-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Use the landscape bedside display for a two-column clock and information layout, with a larger clock and more room for date, weather, and agenda.
+- Increased Android `versionCode` to 39.
+
+## [1.0.35-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Replace legacy platform media glyphs with consistent vector artwork for previous, play, pause, and next controls.
+- Increased Android `versionCode` to 38.
+
+## [1.0.34-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Keep previous, play/pause, and next controls visible throughout an active audio card; disable unsupported controls and explain remote-control connection status.
+- Increased Android `versionCode` to 37.
+
+## [1.0.33-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Complete the grouped settings list treatment for the audio sync adjustment row, including its divider and focus surface.
+- Increased Android `versionCode` to 36.
+
+## [1.0.32-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Restyle settings as a grouped list with subtle row separators and a full-row high-contrast focus treatment for remote navigation.
+- Increased Android `versionCode` to 35.
+
+## [1.0.31-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Match Home screen service button availability and emphasis to the current service state, preventing redundant start/stop actions.
+- Increased Android `versionCode` to 34.
+
+## [1.0.30-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Keep the now-playing card responsive to available landscape width and reserve a gap beside the volume control.
+- Increased Android `versionCode` to 33.
+
+## [1.0.29-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Adapt the now-playing card width to the available landscape space and reserve a clear touch gap beside the volume rail in compact layouts.
+- Keep album-art sizing tied to available height while centering the composition on wide tablet screens.
+- Increased Android `versionCode` to 32.
+
+## [1.0.28-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Restyle the LAN device discovery refresh action as a rounded mint control with a high-contrast TV remote focus ring.
+- Increased Android `versionCode` to 31.
+
+## [1.0.27-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Clarify the Home screen service-action hierarchy with a high-contrast primary start button, restrained destructive stop styling, and neutral restart styling.
+- Use rounded controls and a distinct, high-contrast focus ring for TV remote navigation.
+- Increased Android `versionCode` to 30.
+
+## [1.0.26-tbj607f] - 2026-10-11
+
+> UI-focused development build; playback protocol and timing paths are unchanged.
+
+### Changed
+- Restyle top-level navigation as a floating glass-like capsule with consistent mint selection and a legible remote-control focus state.
+- Expanded navigation pill spacing and use bright text for both focused and selected destinations.
+- Increased Android `versionCode` to 29.
+
+## [1.0.25-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+> Functional validation baseline. Subsequent work was UI-focused; playback regression testing was not repeated for each UI-only build.
+
+### Fixed
+- Keep AirPlay's lowest non-muted volume above Android's mute index, and map Android's first audible media-volume step back to the playback slider's lowest non-muted position.
+
+### Changed
+- Increased Android `versionCode` to 28.
+
+## [1.0.24-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Enable play/pause when the sender supports separate Play or Pause commands but not the Toggle command; choose the direction from the sender's reported playback state.
+
+### Changed
+- Increased Android `versionCode` to 27.
+
+## [1.0.23-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Serialize outgoing AirPlay 2 event-channel commands so CSeq assignment and socket write order stay aligned during rapid button presses.
+
+### Changed
+- Increased Android `versionCode` to 26.
+
+## [1.0.22-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Replace the solid-square settings-row graphic with a slim rounded chevron for display-name and device-mode navigation.
+
+### Changed
+- Increased Android `versionCode` to 25.
+
+## [1.0.21-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Localize bedside weather and agenda status text for Chinese, German, and French instead of embedding Chinese UI strings in the playback view.
+- Use the device locale for weather place search and date formatting; use an explicit weather failure state for retries.
+
+### Changed
+- Increased Android `versionCode` to 24.
+
+## [1.0.20-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Changed
+- Require confirmation before restoring all settings to defaults, with translated dialog copy.
+- Increased Android `versionCode` to 23.
+
+## [1.0.19-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Retry weather immediately when the widget is re-enabled after its scheduled retry was skipped while disabled.
+
+### Changed
+- Increased Android `versionCode` to 22.
+
+## [1.0.18-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Retry optional bedside weather after a transient network/API failure and log the cause for diagnosis.
+- Keep weather results associated with the selected city when settings change during an in-flight request.
+
+### Changed
+- Increased Android `versionCode` to 21.
+
+## [1.0.17-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Added
+- Parse sender-advertised MediaRemote commands and disable unsupported playback-card controls.
+- Reflect sender `PlaybackRate` in the playback-card play/pause icon instead of toggling it optimistically.
+
+### Changed
+- Increased Android `versionCode` to 20.
+
+## [1.0.16-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Declare `MODIFY_AUDIO_SETTINGS` explicitly for AirPlay and Android `STREAM_MUSIC` volume synchronization.
+- Log each AirPlay-to-Android and Android-to-AirPlay volume update to make device verification observable.
+
+### Changed
+- Increased Android `versionCode` to 19.
+
+## [1.0.15-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Keep Android media-volume changes synchronized with the AirPlay receiver and playback-card slider while the app is backgrounded or the screen is off.
+
+### Changed
+- Increased Android `versionCode` to 18.
+
+## [1.0.14-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Round AirPlay slider values to the nearest Android media-volume step to avoid a systematic low bias.
+
+### Changed
+- Increased Android `versionCode` to 17.
+
+## [1.0.13-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Added
+- Optional bedside agenda widget that shows up to two remaining events from today's Android calendar, only after the user enables it and grants calendar access.
+
+### Changed
+- Increased Android `versionCode` to 16.
+
+## [1.0.12-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Prevent duplicate Android media-volume writes when the playback slider or iOS changes AirPlay volume.
+
+### Changed
+- Increased Android `versionCode` to 15.
+
+## [1.0.11-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Keep the receiver's active AirPlay volume state aligned when Android media volume changes, and report that shared value for RTSP volume queries.
+
+### Changed
+- Increased Android `versionCode` to 14.
+
+## [1.0.10-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Map AirPlay's linear -30..0 dB slider consistently to the playback card and Android media-volume index; preserve -144 dB as mute.
+
+### Changed
+- Increased Android `versionCode` to 13.
+
+## [1.0.9-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Open and advertise an encrypted AirPlay event port for transient-paired buffered audio sessions so iOS can connect remote controls.
+
+### Changed
+- Increased Android `versionCode` to 12.
+
+## [1.0.8-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Allow the position servo to recover from large but valid startup phase errors instead of rejecting them indefinitely.
+- Move the volume percentage label above the vertical slider so it no longer overlaps the track.
+
+### Changed
+- Increased Android `versionCode` to 11.
+
+## [1.0.7-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Fixed
+- Prevent a closing event socket from clearing the state of a newer AirPlay session.
+- Close any prior event listener and connection before creating a fresh session event port.
+
+### Changed
+- Increased Android `versionCode` to 10.
+
+---
+
+## [1.0.6-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Changed
+- Include the receiver's current DNS-SD TXT record fields in the event channel's initial `updateInfo` message.
+- Increased Android `versionCode` to 9.
+
+---
+
+## [1.0.5-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Changed
+- Send the receiver's AirPlay `updateInfo` on event-channel connection before waiting for sender events or remote commands.
+- Include the configured receiver name and display dimensions in that initialization payload.
+- Increased Android `versionCode` to 8.
+
+---
+
+## [1.0.4-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Added
+- AirPlay 2 MediaRemote play/pause, next, and previous commands over the encrypted event channel, with DACP retained as a legacy fallback.
+- Event-channel request handling and RTSP 200 responses to keep the encrypted session alive.
+- Event-channel availability now exposes the playback controls even when iOS omits DACP headers.
+
+### Changed
+- Increased Android `versionCode` to 7.
+
+---
+
+## [1.0.3-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Changed
+- Centered the live volume percentage over the vertical slider while preserving native SeekBar touch handling.
+- Widened the slider surface slightly for clearer spacing around the centered value.
+- Increased Android `versionCode` to 6.
+
+---
+
+## [1.0.2-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Changed
+- Centered the playback-card volume label in its glass control.
+- Crossfade album artwork and the cover-derived background on actual track changes while ignoring routine metadata refreshes.
+- Increased Android `versionCode` to 5.
+
+---
+
+## [1.0.1-tbj607f] - 2026-10-11
+
+> Device-validation development build for the Google TV flavor; not a GitHub release.
+
+### Changed
+- Restored the bedside clock / now-playing entry and refined the player screen controls, artwork identity handling, and display settings.
+- Replaced the custom rotated volume touch control with Android's themed native `SeekBar`, preserving the existing media-stream volume integration.
+- Increased Android `versionCode` to 4. Google TV and Fire TV APK names include their flavor suffix.
+
+---
+
 ## [1.0.0-beta.2] - 2026-10-09
 
 ### Fixed

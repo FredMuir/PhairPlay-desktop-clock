@@ -5,6 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import com.phairplay.service.ProtocolState
+import com.phairplay.settings.AirPlayDeviceMode
 import com.phairplay.util.Logger
 import com.phairplay.util.NetworkUtils
 
@@ -35,6 +36,8 @@ import com.phairplay.util.NetworkUtils
  */
 class MdnsService(
     private val context: Context,
+    private val deviceMode: AirPlayDeviceMode = AirPlayDeviceMode.HOMEPOD,
+    private val pinAuthEnabled: Boolean = false,
     private val onStateChange: (ProtocolState) -> Unit = {},
     /**
      * Called with the actual mDNS service name after registration completes.
@@ -208,12 +211,14 @@ class MdnsService(
 
             // Core identity TXT records
             setAttribute("deviceid", NetworkUtils.getMacAddress())
-            setAttribute("features", AIRPLAY_FEATURES)
-            setAttribute("model", AIRPLAY_MODEL)
-            setAttribute("srcvers", AIRPLAY_SERVER_VERSION)
+            setAttribute("features", deviceMode.featuresTxt)
+            setAttribute("model", deviceMode.model)
+            setAttribute("srcvers", deviceMode.sourceVersion)
             setAttribute("vv", "2")                             // AirPlay protocol version 2
             setAttribute("pi", NetworkUtils.getPersistentUuid(context))
-            setAttribute("flags", "0x4")                        // Screen-mirroring receiver
+            // Bit 3 advertises PINRequired; bit 2 is the existing mirroring flag.
+            setAttribute("flags", if (pinAuthEnabled) "0xC" else "0x4")
+            if (pinAuthEnabled) setAttribute("pw", "true")
         }
 
         airPlayListener = createRegistrationListener(
@@ -259,8 +264,9 @@ class MdnsService(
             setAttribute("sv", "false")            // Software volume control
             setAttribute("tp", "UDP")              // Transport for audio RTP
             setAttribute("vn", "65537")            // Version number (required)
-            setAttribute("vs", AIRPLAY_SERVER_VERSION)
-            setAttribute("am", AIRPLAY_MODEL)
+            setAttribute("vs", deviceMode.sourceVersion)
+            setAttribute("am", deviceMode.model)
+            if (pinAuthEnabled) setAttribute("pw", "true")
         }
 
         raopListener = createRegistrationListener(
@@ -346,16 +352,5 @@ class MdnsService(
         /** AirPlay RTSP port — [RtspHandler] must listen on this port. */
         const val AIRPLAY_PORT = 7000
 
-        /**
-         * AirPlay feature bitmask: advertise screen mirroring, video, and audio support.
-         * See TECHNICAL_SPEC.md §8 for the full bit-level breakdown.
-         */
-        private const val AIRPLAY_FEATURES = "0x5A7FFFF7,0x1E"
-
-        /** Pretend to be an Apple TV so macOS uses the screen mirroring protocol. */
-        private const val AIRPLAY_MODEL = "AppleTV5,3"
-
-        /** AirPlay server version — matches a real Apple TV for maximum compatibility. */
-        private const val AIRPLAY_SERVER_VERSION = "220.68"
     }
 }

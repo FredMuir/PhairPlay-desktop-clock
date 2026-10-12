@@ -72,6 +72,33 @@
     <string name="setting_debug_overlay_subtitle">FPS und Latenz auf dem Streaming-Bildschirm anzeigen</string>
     <string name="setting_version">Version</string>
     <string name="setting_reset_defaults">Auf Standardwerte zurücksetzen</string>
+    <string name="setting_reset_defaults_message">Alle Einstellungen einschließlich Gerätemodus, Lautstärkeanzeige und Nachttischuhr werden zurückgesetzt. Dieser Vorgang kann nicht rückgängig gemacht werden.</string>
+    <string name="setting_reset_confirm">Zurücksetzen</string>
+
+    <!-- ── Now-playing widgets ─────────────────────────────────── -->
+    <string name="now_playing_weather_city_missing">Wetter · Stadt in den Einstellungen festlegen</string>
+    <string name="now_playing_weather_loading">Wetter · %1$s · wird aktualisiert</string>
+    <string name="now_playing_weather_unavailable">Wetter · nicht verfügbar, neuer Versuch folgt</string>
+    <string name="now_playing_weather_city_not_found">Stadt nicht gefunden</string>
+    <string name="now_playing_weather_result">%1$s  %2$s  %3$d°</string>
+    <string name="now_playing_weather_updated">Wetter · %1$s</string>
+    <string name="now_playing_weather_clear">Sonnig</string>
+    <string name="now_playing_weather_partly_cloudy">Teilweise bewölkt</string>
+    <string name="now_playing_weather_overcast">Bedeckt</string>
+    <string name="now_playing_weather_fog">Nebel</string>
+    <string name="now_playing_weather_rain">Regen</string>
+    <string name="now_playing_weather_snow">Schnee</string>
+    <string name="now_playing_weather_showers">Regenschauer</string>
+    <string name="now_playing_weather_thunderstorm">Gewitter</string>
+    <string name="now_playing_weather_cloudy">Bewölkt</string>
+    <string name="now_playing_agenda_loading">Heutige Termine · werden geladen</string>
+    <string name="now_playing_agenda_permission">Heutige Termine · Kalenderzugriff erforderlich</string>
+    <string name="now_playing_agenda_untitled">Termin ohne Titel</string>
+    <string name="now_playing_agenda_all_day">Ganztägig</string>
+    <string name="now_playing_agenda_event">%1$s  %2$s</string>
+    <string name="now_playing_agenda_empty">Heutige Termine · Keine weiteren Termine</string>
+    <string name="now_playing_agenda_events">Heutige Termine · %1$s</string>
+    <string name="now_playing_agenda_unavailable">Heutige Termine · Kalender nicht verfügbar</string>
 
     <!-- ── Waiting screen ──────────────────────────────────────── -->
     <string name="waiting_title">Bereit für AirPlay</string>

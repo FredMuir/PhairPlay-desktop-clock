@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AirPlay protocol status mark -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
-    <size android:width="32dp" android:height="32dp" />
-    <solid android:color="@color/protocol_airplay" />
-</shape>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="@color/protocol_airplay"
+        android:pathData="M24,4 L5,34 L43,34 Z M14,40 L34,40 L34,44 L14,44 Z" />
+</vector>

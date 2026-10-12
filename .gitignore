@@ -3,6 +3,8 @@
 .gradle/
 .toolchains/
 local.properties
+.codex-build/
+.codex-build-init.gradle
 .idea/
 .DS_Store
 build/
@@ -12,6 +14,7 @@ captures/
 *.apk
 *.aab
 *.ap_
+*.apk.idsig
 
 # Android Studio
 *.iws

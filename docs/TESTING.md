@@ -2,6 +2,8 @@
 
 This document explains how to run tests, what is tested, and how to perform manual testing on real devices.
 
+Choose checks based on the changed behavior and target device. UI-only changes can use builds and visual inspection; changes to protocol, audio output, volume, or synchronization require targeted playback checks. A build or screenshot does not establish runtime compatibility, and release acceptance still requires the relevant scenarios below.
+
 ---
 
 ## How to Run Tests

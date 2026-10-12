@@ -3,7 +3,7 @@
 Version: 2.1
 Status: Active
 Date: 2026-03-23
-Last Updated: 2026-05-23
+Last Updated: 2026-10-11
 
 ---
 
@@ -27,14 +27,20 @@ Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 
 | 2 | M2 – mDNS | ✅ Complete | AirPlay mDNS + InfoResponder implemented; Miracast WFD advertising added; Cast remains registration-dependent |
 | 3 | M3 – AirPlay Handshake | ✅ Complete | Full RTSP router, SDP parsing, plist codec, pairing (Ed25519/X25519 + SRP), FairPlay fp-setup, `/photo` endpoint, 247 unit tests |
 | 4 | M4 – AirPlay Video | ✅ Complete | H.264 via MirrorStreamServer + MirrorCrypto (AES-128-CTR), MediaCodec with SPS-driven reinit and self-heal, aspect-fit rendering; real-device validation ongoing |
-| 5 | M5 – AirPlay Audio | ✅ Complete | AAC-ELD/AAC-LC (AudioStreamServer), ALAC (AlacDecoder + libalac), AES-128-CBC, NTP sync, DACP reverse remote, NowPlayingScreen; real-device validation ongoing |
+| 5 | M5 – AirPlay Audio | ✅ Implemented | AAC-ELD/AAC-LC, ALAC, realtime and buffered type-103 streams, PTP multi-room timing, system media-volume bridge, MediaRemote/DACP controls, and now-playing UI; see the testing guide for device validation scope |
 | 6 | M6 – Miracast | 🔄 Started | Wi-Fi Direct/WFD advertising and RTSP control-plane implemented; system API limitations identified (see ADR-004) |
 | 7 | M7 – Google Cast | 🔄 Started | Google TV Cast Connect SDK lifecycle implemented; full testing requires registered Cast app ID |
-| 8 | M8 – Stability | 🔄 In Progress | Screen awake, mDNS standby recovery & socket binding fixes integrated in v1.0.0-beta.2 |
+| 8 | M8 – Stability | 🔄 In Progress | mDNS standby recovery, socket binding, configurable screen timeout/bedside clock, and background Android media-volume observation; protocol, audio, and synchronization changes require targeted device validation |
 | 9 | M9 – Fire TV | 🔄 In Progress | Signed Fire TV APK released (v1.0.0-beta.2); screensaver timeout resolved |
-| 10 | M10 – i18n | 🔄 Partial | EN/DE resource structure exists; full UX string audit pending |
-| 11 | M11 – Release | 🔄 Beta | v1.0.0-beta.2 signed release published on GitHub (2026-10-09) |
+| 10 | M10 – i18n | 🔄 Partial | Bedside weather/agenda and date display now follow zh/de/fr resources and device locale; full UX string audit remains pending |
+| 11 | M11 – Release | 🔄 Beta | v1.0.0-beta.2 is the latest published GitHub release; development builds are not releases until packaged and published deliberately |
 | 12 | M12 – DLNA | 📋 Planned | Stepwise UPnP/DLNA MediaRenderer for Windows & Android (see ADR-004) |
+
+Current work includes interface polish and receiver compatibility. Run targeted on-device playback checks when changes touch AirPlay protocol, audio output, or synchronization.
+
+Device-specific build steps, maintenance lessons, validation limits, and reusable Android project recommendations are collected in [MAINTENANCE_PLAYBOOK_ZH.md](../MAINTENANCE_PLAYBOOK_ZH.md).
+
+Recent development iterations refine navigation, settings, Home actions, and LAN device discovery. Playback transport controls stay visible while unsupported commands show a clear unavailable state. The landscape bedside display separates the clock from weather and agenda information. The v1.0.37 source restores documented receiver defaults and adds PIN-protected discovery/handshake corrections. The v1.0.38 candidate addresses type-103 song-start phase lag by waiting for stable timestamps and skipping bounded late startup audio. The debug build completed; this change still needs device playback validation.
 
 ---
 

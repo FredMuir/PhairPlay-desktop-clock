@@ -27,6 +27,8 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Read/write STREAM_MUSIC so AirPlay and Android system volume stay linked. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Foreground service — keeps receiver alive when app is in background -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -44,6 +46,9 @@
     <!-- Foreground service notification (Android 13+ requires runtime grant) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Requested only when the user enables the optional bedside agenda widget. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <!--
         Declare this app as a TV app (leanback).
         Required for the app to appear in the TV launcher.
@@ -55,7 +60,7 @@
         android:required="false" />
     <uses-feature
         android:name="android.software.leanback"
-        android:required="true" />
+        android:required="false" />
     <uses-feature
         android:name="android.hardware.wifi"
         android:required="false" />
@@ -82,21 +87,21 @@
 
             - launchMode="singleTop": prevents duplicate instances when
               the user launches the app again while it's running
-            - screenOrientation="landscape": TV apps are always landscape
-            - configChanges: handle orientation/screen size changes ourselves
-              to avoid destroying the RTSP session on a config change
+            - screenOrientation="unspecified": tablets and phones can use either orientation
+            - standard Activity recreation updates the layout on orientation/size changes;
+              the receiver service remains independent and keeps streaming
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-            android:theme="@style/Theme.PhairPlay.Fullscreen">
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.PhairPlay">
 
             <!-- Makes the app launchable from the TV home screen -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>

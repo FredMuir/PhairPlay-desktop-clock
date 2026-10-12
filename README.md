@@ -16,11 +16,15 @@ PhairPlay is a free, open-source, ad-free AirPlay 2 receiver for Android TV and 
 
 ---
 
-## Current Status — v1.0.0-beta.2
+## Current Status — v1.0.38 development candidate
 
-PhairPlay's AirPlay 2 receiver is fully implemented and available as a signed beta release. Download the latest APK directly from the [GitHub Releases page](https://github.com/mazer666/PhairPlay/releases).
+The current source candidate is **1.0.38** (`versionCode` 41). It includes restored protocol defaults, PIN-auth discovery/handshake fixes, and startup synchronization that can skip up to one second of audio already late against the shared PTP timeline. The `googletvDebug` build completed, but the startup change still needs device and group-playback validation. This is a development build, not a GitHub release. See the [Releases page](https://github.com/mazer666/PhairPlay/releases) for published packages; their feature set may differ from the current source.
 
-The AirPlay 2 stack is complete end-to-end: mDNS advertising (with standby auto-recovery and Wi-Fi multicast lock), RTSP handshake (up to 1 MB payload support for iOS 17+ setups), HomeKit-style pairing, FairPlay key decryption, H.264 mirroring, AAC-ELD/AAC-LC/ALAC audio, NTP A/V sync, keep-screen-on display management, and DACP reverse remote. Real-device validation with macOS and iOS senders is ongoing.
+The AirPlay 2 stack includes mDNS advertising (with standby recovery and Wi-Fi multicast lock), RTSP/HomeKit pairing, FairPlay key decryption, H.264 mirroring, AAC-ELD/AAC-LC/ALAC audio, realtime and buffered audio streams, PTP timing for multi-room playback, artwork/metadata display, and remote-control paths over MediaRemote and DACP. Playback, protocol, and synchronization support vary by Android device and sender; consult the testing guide for validation expectations.
+
+The Android app also includes an AirPlay-device discovery/management page and an optional bedside clock with date, calendar, and weather widgets. Weather requires internet access; the AirPlay receiver itself works on the local network without a cloud service.
+
+For portable build guidance, validation boundaries, synchronization and UI lessons, and maintenance recommendations, see the [PhairPlay maintenance playbook](docs/MAINTENANCE_PLAYBOOK_ZH.md).
 
 Miracast and Google Cast receiver stacks are in progress (control-plane implemented; media playback pending). In addition, **UPnP/DLNA MediaRenderer** is planned as an upcoming option for Windows ("Cast to Device"), VLC, and mobile UPnP controllers (see [ADR-004](docs/decisions/ADR-004-dlna-mediarenderer-roadmap.md)).
 
@@ -28,7 +32,7 @@ Miracast and Google Cast receiver stacks are in progress (control-plane implemen
 
 ### AirPlay 2 (fully implemented)
 - Screen mirroring from macOS 12+ and iOS/iPadOS 16+ — H.264 hardware decode
-- Keep screen awake during mirroring and audio playback (`FLAG_KEEP_SCREEN_ON`) — prevents TV screensaver or sleep
+- Configurable screen timeout during audio playback and optional bedside-clock keep-awake/dim behavior
 - Automatic mDNS recovery after TV wake from standby or Wi-Fi reconnect
 - Wi-Fi Multicast Lock held during advertising for reliable device discovery
 - Robust socket binding to IPv4 wildcard (`0.0.0.0`) across all Android TV / Fire TV models
@@ -39,7 +43,7 @@ Miracast and Google Cast receiver stacks are in progress (control-plane implemen
 - AirPlay video URL mode (`/play` content) + transport controls (play/pause/scrub)
 - Now-playing metadata (DMAP) with album artwork overlay
 - DACP reverse remote — TV remote controls the sender's playback
-- NTP timing and UDP audio retransmit (packet-loss recovery)
+- PTP timing and receiver-side scheduling for multi-room playback; UDP audio retransmit for packet-loss recovery
 - AirPlay photo receiver — JPEG/PNG from iOS Photos app displayed full-screen
 - Access-control lockout after repeated failed pairing attempts
 
@@ -50,14 +54,13 @@ Miracast and Google Cast receiver stacks are in progress (control-plane implemen
 - Works on Google TV (Android 10+) and Fire TV (Android 7+)
 - Miracast Wi-Fi Direct / WFD advertisement and RTSP control-plane
 - Google TV Cast Connect SDK lifecycle (full testing requires Cast app ID)
-- Zero ads, zero analytics, zero internet required
+- Zero ads and zero analytics; core AirPlay reception is LAN-local, while the optional weather widget uses internet
 - Open source — Apache 2.0 license
 
 ## What PhairPlay Does NOT Do
 
 - **FairPlay DRM content** (Netflix, Disney+, Apple TV+) — Apple DRM; not decryptable by any open-source receiver
 - **Apple Music in-app audio** — protected on every AirPlay path; use system audio output instead
-- **Buffered audio playback** (AirPlay 2 type 103) — accepted but not played back yet
 - **Cloud/remote streaming** — local network only
 - **Miracast / Cast media playback** — control plane is ready; media decode integration is in progress
 

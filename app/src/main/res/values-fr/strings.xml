@@ -39,5 +39,32 @@
     <string name="setting_miracast_enabled">Récepteur Miracast</string>
     <string name="setting_cast_enabled">Récepteur Google Cast</string>
     <string name="setting_reset_defaults">Réinitialiser les paramètres</string>
+    <string name="setting_reset_defaults_message">Tous les paramètres, y compris le mode de l’appareil, l’affichage du volume et l’horloge de chevet, seront réinitialisés. Cette action est irréversible.</string>
+    <string name="setting_reset_confirm">Réinitialiser</string>
+
+    <!-- ── Widgets de lecture ─────────────────────────────────── -->
+    <string name="now_playing_weather_city_missing">Météo · indiquez une ville dans les paramètres</string>
+    <string name="now_playing_weather_loading">Météo · %1$s · mise à jour</string>
+    <string name="now_playing_weather_unavailable">Météo · indisponible, nouvelle tentative prévue</string>
+    <string name="now_playing_weather_city_not_found">Ville introuvable</string>
+    <string name="now_playing_weather_result">%1$s  %2$s  %3$d°</string>
+    <string name="now_playing_weather_updated">Météo · %1$s</string>
+    <string name="now_playing_weather_clear">Ensoleillé</string>
+    <string name="now_playing_weather_partly_cloudy">Partiellement nuageux</string>
+    <string name="now_playing_weather_overcast">Couvert</string>
+    <string name="now_playing_weather_fog">Brouillard</string>
+    <string name="now_playing_weather_rain">Pluie</string>
+    <string name="now_playing_weather_snow">Neige</string>
+    <string name="now_playing_weather_showers">Averses</string>
+    <string name="now_playing_weather_thunderstorm">Orage</string>
+    <string name="now_playing_weather_cloudy">Nuageux</string>
+    <string name="now_playing_agenda_loading">Programme du jour · chargement</string>
+    <string name="now_playing_agenda_permission">Programme du jour · autorisation du calendrier requise</string>
+    <string name="now_playing_agenda_untitled">Événement sans titre</string>
+    <string name="now_playing_agenda_all_day">Toute la journée</string>
+    <string name="now_playing_agenda_event">%1$s  %2$s</string>
+    <string name="now_playing_agenda_empty">Programme du jour · aucun autre événement</string>
+    <string name="now_playing_agenda_events">Programme du jour · %1$s</string>
+    <string name="now_playing_agenda_unavailable">Programme du jour · calendrier indisponible</string>
 
 </resources>

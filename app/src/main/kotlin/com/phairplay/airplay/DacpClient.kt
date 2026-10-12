@@ -27,7 +27,7 @@ import java.net.URL
  *
  * Reference: DACP (iTunes remote) over the AirPlay reverse channel.
  */
-class DacpClient(context: Context) {
+class DacpClient(context: Context, private val onReadyChanged: (Boolean) -> Unit = {}) {
 
     private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -43,18 +43,27 @@ class DacpClient(context: Context) {
      * mDNS discovery the first time a new sender is seen; cheap no-op on repeats.
      */
     fun configure(newDacpId: String?, newActiveRemote: String?) {
-        if (newDacpId.isNullOrBlank() || newActiveRemote.isNullOrBlank()) return
+        if (newDacpId.isNullOrBlank() && newActiveRemote.isNullOrBlank()) {
+            dacpId = null; activeRemote = null; resolvedHost = null; resolvedPort = 0
+            stopDiscovery(); onReadyChanged(false)
+            return
+        }
+        if (newDacpId.isNullOrBlank() || newActiveRemote.isNullOrBlank()) {
+            Logger.d("DACP unavailable: sender did not advertise DACP-ID/Active-Remote")
+            return
+        }
         if (newDacpId == dacpId && newActiveRemote == activeRemote) return
         dacpId = newDacpId
         activeRemote = newActiveRemote
         resolvedHost = null
         resolvedPort = 0
+        onReadyChanged(false)
         Logger.i("DACP configured: id=$newDacpId — discovering iTunes_Ctrl_$newDacpId")
         startDiscovery("iTunes_Ctrl_$newDacpId")
     }
 
     /** True once we have a sender identity (so the UI can know remote control is available). */
-    val isAvailable: Boolean get() = activeRemote != null
+    val isAvailable: Boolean get() = activeRemote != null && resolvedHost != null && resolvedPort != 0
 
     /** Sends a DACP command (e.g. "playpause", "nextitem"). No-op until the service is resolved. */
     fun sendCommand(command: String) {
@@ -78,6 +87,11 @@ class DacpClient(context: Context) {
 
     fun stop() {
         stopDiscovery()
+        dacpId = null
+        activeRemote = null
+        resolvedHost = null
+        resolvedPort = 0
+        onReadyChanged(false)
         scope.cancel()
     }
 
@@ -85,7 +99,8 @@ class DacpClient(context: Context) {
         stopDiscovery()
         val listener = object : NsdManager.DiscoveryListener {
             override fun onServiceFound(info: NsdServiceInfo) {
-                if (info.serviceName == targetName) {
+                Logger.d("DACP discovery found: ${info.serviceName}")
+                if (info.serviceName.equals(targetName, ignoreCase = true)) {
                     runCatching { nsdManager.resolveService(info, resolveListener()) }
                 }
             }
@@ -107,10 +122,12 @@ class DacpClient(context: Context) {
             resolvedHost = info.host?.hostAddress
             resolvedPort = info.port
             Logger.i("DACP resolved: $resolvedHost:$resolvedPort")
+            onReadyChanged(isAvailable)
             stopDiscovery()   // got it; stop scanning
         }
         override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) {
             Logger.w("DACP resolve failed: $errorCode")
+            onReadyChanged(false)
         }
     }
 

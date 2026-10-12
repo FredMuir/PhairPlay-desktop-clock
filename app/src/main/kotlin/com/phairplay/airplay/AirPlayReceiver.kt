@@ -5,20 +5,29 @@ import android.view.Surface
 import com.phairplay.airplay.handshake.AirPlayNtpClient
 import com.phairplay.airplay.handshake.AudioStreamServer
 import com.phairplay.airplay.handshake.BufferedAudioServer
+import com.phairplay.airplay.handshake.HapEventCrypto
+import com.phairplay.airplay.handshake.InfoResponder
 import com.phairplay.airplay.handshake.MirrorStreamServer
+import com.phairplay.airplay.handshake.PlistCodec
+import com.phairplay.airplay.handshake.PtpClock
 import com.phairplay.service.ProtocolState
+import com.phairplay.settings.AirPlayDeviceMode
 import com.phairplay.util.Logger
+import com.phairplay.util.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.ServerSocket
 import java.net.Socket
+import java.io.ByteArrayOutputStream
 
 /**
  * AirPlayReceiver — Top-level orchestrator for the AirPlay 2 receiver pipeline.
@@ -57,6 +66,7 @@ class AirPlayReceiver(
     private val mirrorHeight: Int = 1080,
     /** Whether to accept the mirroring audio stream (experimental — see AppSettings.mirrorAudioEnabled). */
     private val audioEnabled: Boolean = false,
+    private val deviceMode: AirPlayDeviceMode = AirPlayDeviceMode.HOMEPOD,
     /** Require HomeKit-style SRP PIN pairing before streaming (AppSettings.airPlayPinAuthEnabled). */
     private val pinAuthEnabled: Boolean = false,
     /** Lazy Surface provider — called only for video streams when RECORD arrives. */
@@ -90,8 +100,14 @@ class AirPlayReceiver(
      * surface; emits null when video is mirroring (the video screen takes over) or audio stops.
      */
     private val onNowPlayingChanged: (NowPlayingInfo?) -> Unit = {},
+    /** Reports receiver-side volume changes so the app's now-playing slider stays in sync. */
+    private val onOutputVolumeChanged: (Float) -> Unit = {},
+    private val initialOutputVolumeDb: Float = 0f,
     /** Pairing PIN to show ([pin]) or hide (null) on the TV during SRP pair-setup. */
-    private val onPinChanged: (pin: String?) -> Unit = {}
+    private val onPinChanged: (pin: String?) -> Unit = {},
+    private val onRemoteControlAvailabilityChanged: (Boolean) -> Unit = {},
+    private val onRemoteControlCommandsChanged: (Set<Int>?) -> Unit = {},
+    private val onRemotePlaybackChanged: (Boolean) -> Unit = {}
 ) {
 
     // Persistent store of paired controllers (for PIN access control / pair-verify).
@@ -115,13 +131,19 @@ class AirPlayReceiver(
     @Volatile private var mirrorServer: MirrorStreamServer? = null
     @Volatile private var audioServer: AudioStreamServer? = null
     @Volatile private var bufferedAudioServer: BufferedAudioServer? = null
+    @Volatile private var ptpClock: PtpClock? = null
     @Volatile private var urlVideoPlayer: AirPlayVideoPlayer? = null
 
     // Reverse remote control (TV → sender). Created lazily once a sender advertises DACP-ID.
-    private val dacpClient = DacpClient(context)
+    private val dacpClient = DacpClient(context) { publishRemoteControlAvailability() }
     @Volatile private var ntpClient: AirPlayNtpClient? = null
     @Volatile private var eventSocket: ServerSocket? = null
     @Volatile private var eventClientSocket: java.net.Socket? = null
+    @Volatile private var eventCrypto: HapEventCrypto? = null
+    @Volatile private var senderSupportedRemoteCommands: Set<Int>? = null
+    @Volatile private var senderPlaybackActive = true
+    private val eventCommandMutex = Mutex()
+    private var eventCommandSequence = 1
     @Volatile private var mirrorAesKey: ByteArray? = null
     @Volatile private var mirrorEcdhSecret: ByteArray? = null
     @Volatile private var mirrorAesIv: ByteArray? = null
@@ -136,6 +158,7 @@ class AirPlayReceiver(
     @Volatile private var npArtist: String? = null
     @Volatile private var npAlbum: String? = null
     @Volatile private var npArtwork: ByteArray? = null
+    @Volatile private var airplayVolumeDb: Float = initialOutputVolumeDb.coerceIn(-144f, 0f)
 
     /**
      * Starts the AirPlay receiver.
@@ -176,6 +199,8 @@ class AirPlayReceiver(
             mdnsService?.stop()
             dacpClient.stop()
             releaseMediaComponents()
+            ptpClock?.stop()
+            ptpClock = null
         } catch (e: Exception) {
             Logger.e("Error during AirPlayReceiver stop", e)
         } finally {
@@ -183,15 +208,101 @@ class AirPlayReceiver(
         }
     }
 
-    /**
-     * Sends a DACP transport command (see [DacpClient] constants) from the TV remote back to the
-     * AirPlay sender — e.g. play/pause or skip what the Mac/iPhone is streaming. No-op if no sender
-     * has advertised a DACP identity yet.
-     */
-    fun sendRemoteCommand(command: String) = dacpClient.sendCommand(command)
+    /** Sends transport commands over AirPlay 2 MediaRemote, falling back to DACP for legacy senders. */
+    fun sendRemoteCommand(command: String) {
+        if (!sendEventRemoteCommand(command)) dacpClient.sendCommand(command)
+    }
 
-    /** True once a sender has advertised DACP reverse-control (so the TV remote can drive playback). */
-    fun isRemoteControlAvailable(): Boolean = dacpClient.isAvailable
+    private fun publishRemoteControlAvailability() {
+        onRemoteControlAvailabilityChanged(dacpClient.isAvailable || eventClientSocket?.isConnected == true)
+    }
+
+    /** AirPlay 2's event channel carries modern MediaRemote commands; DACP remains the legacy fallback. */
+    private fun sendEventRemoteCommand(command: String): Boolean {
+        val modernCommand = when (command) {
+            DacpClient.CMD_PLAY_PAUSE -> {
+                val supported = senderSupportedRemoteCommands
+                when {
+                    supported == null || 2 in supported -> 2 // prefer sender-native toggle
+                    senderPlaybackActive && 1 in supported -> 1 // pause
+                    !senderPlaybackActive && 0 in supported -> 0 // play
+                    else -> return false
+                }
+            }
+            DacpClient.CMD_NEXT -> 4
+            DacpClient.CMD_PREV -> 5
+            else -> return false
+        }
+        val socket = eventClientSocket?.takeIf { it.isConnected && !it.isClosed } ?: return false
+        val crypto = eventCrypto ?: return false
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                postEventCommand(socket, crypto, mapOf(
+                    "type" to "sendMediaRemoteCommand",
+                    "modernMediaRemoteCommand" to modernCommand
+                ), "remote command $command (MediaRemote=$modernCommand)")
+            }.onFailure { Logger.e("AirPlay 2 event remote command $command failed", it) }
+        }
+        return true
+    }
+
+    private suspend fun postEventCommand(socket: Socket, crypto: HapEventCrypto, message: Map<String, Any?>, label: String) {
+        eventCommandMutex.withLock {
+            val body = PlistCodec.encode(message)
+            val cseq = eventCommandSequence++
+            val header = buildString {
+                append("POST /command RTSP/1.0\r\n")
+                append("CSeq: $cseq\r\n")
+                append("Content-Type: application/x-apple-binary-plist\r\n")
+                append("Content-Length: ${body.size}\r\n\r\n")
+            }.toByteArray(Charsets.US_ASCII)
+            crypto.write(socket.getOutputStream(), header + body)
+            Logger.i("AirPlay 2 event $label sent (CSeq=$cseq)")
+        }
+    }
+
+    /** DNS-SD TXT wire bytes copied into updateInfo, matching the receiver's current mDNS record. */
+    private fun buildAirPlayTxtRecord(): ByteArray {
+        val fields = listOf(
+            "deviceid" to NetworkUtils.getMacAddress(),
+            "features" to deviceMode.featuresTxt,
+            "model" to deviceMode.model,
+            "srcvers" to deviceMode.sourceVersion,
+            "vv" to "2",
+            "pi" to NetworkUtils.getPersistentUuid(context),
+            "flags" to if (pinAuthEnabled) "0xC" else "0x4"
+        )
+        val advertisedFields = if (pinAuthEnabled) fields + ("pw" to "true") else fields
+        return ByteArrayOutputStream().apply {
+            advertisedFields.forEach { (key, value) ->
+                val entry = "$key=$value".toByteArray(Charsets.UTF_8)
+                require(entry.size <= 255) { "AirPlay TXT entry exceeds DNS-SD limit: $key" }
+                write(entry.size)
+                write(entry)
+            }
+        }.toByteArray()
+    }
+
+    /** Sets local output gain and remembers it for streams created later in this AirPlay session. */
+    fun setOutputVolumeDb(volumeDb: Float) {
+        val clamped = volumeDb.coerceIn(-144f, 0f)
+        airplayVolumeDb = clamped
+        audioServer?.setVolume(clamped)
+        bufferedAudioServer?.setVolume(clamped)
+        onOutputVolumeChanged(clamped)
+    }
+
+    /** Mirrors Android's media stream value without echoing another system-volume write. */
+    fun syncOutputVolumeFromSystem(volumeDb: Float) {
+        val clamped = volumeDb.coerceIn(-144f, 0f)
+        airplayVolumeDb = clamped
+        audioServer?.setVolume(clamped)
+        bufferedAudioServer?.setVolume(clamped)
+    }
+
+    /** True while either modern event-channel or legacy DACP transport control is available. */
+    fun isRemoteControlAvailable(): Boolean =
+        dacpClient.isAvailable || eventClientSocket?.isConnected == true
 
     /**
      * Re-registers the mDNS advertisement without touching the RTSP/timing servers.
@@ -226,6 +337,8 @@ class AirPlayReceiver(
     private fun startMdnsService() {
         mdnsService = MdnsService(
             context = context,
+            deviceMode = deviceMode,
+            pinAuthEnabled = pinAuthEnabled,
             onStateChange = { state -> emitState(state) },
             onActualNameRegistered = { actualName -> onActualNameRegistered(actualName) }
         ).also { it.start(displayName.ifBlank { null }) }
@@ -235,6 +348,7 @@ class AirPlayReceiver(
     private fun startRtspHandler() {
         rtspHandler = RtspHandler(
             context = context,
+            deviceMode = deviceMode,
             displayWidth = mirrorWidth,
             displayHeight = mirrorHeight,
             audioEnabled = audioEnabled,
@@ -250,16 +364,43 @@ class AirPlayReceiver(
             onMirrorAudioStart = { sampleRate, channels, ct, spf -> startMirrorAudio(sampleRate, channels, ct, spf) },
             onMirrorAudioStop = { stopMirrorAudio() },
             onMirrorVideoStop = { stopMirrorVideo() },
-            onBufferedAudioStart = { startBufferedAudio() },
+            onBufferedAudioStart = { key, format, spf -> startBufferedAudio(key, format, spf) },
+            onBufferedAudioRate = { command ->
+                val rate = (command["rate"] as? Number)?.toDouble()
+                val seconds = command["networkTimeSecs"]
+                val fraction = command["networkTimeFrac"]
+                val rtp = command["rtpTime"]
+                Logger.i("Buffered anchor: rate=$rate PTP=$seconds:$fraction RTP=$rtp (no PTP clock mapping)")
+                val secondsValue = (seconds as? Number)?.toLong()
+                val fractionValue = (fraction as? Number)?.toLong()
+                val anchorNanos = if (secondsValue != null && fractionValue != null) {
+                    val fractionNs = (fractionValue.toULong().toDouble() / 18446744073709551616.0 * 1_000_000_000.0).toLong()
+                    secondsValue * 1_000_000_000L + fractionNs
+                } else null
+                val rtpTime = (rtp as? Number)?.toLong()?.and(0xffff_ffffL)
+                bufferedAudioServer?.setAnchor(rate, anchorNanos, rtpTime, ptpClock?.masterMinusLocalNanos)
+            },
+              onPtpPeers = { peers, localAddress ->
+                val clock = ptpClock ?: PtpClock(context) { offset -> bufferedAudioServer?.setPtpOffset(offset) }
+                    .also { ptpClock = it }
+                  clock.setPeers(peers, localAddress?.hostAddress)
+            },
             onBufferedAudioStop = { stopBufferedAudio() },
-            onVolume = { v -> audioServer?.setVolume(v) },
+            onVolume = { v ->
+                setOutputVolumeDb(v)
+            },
+            currentOutputVolumeDb = { airplayVolumeDb },
             onNowPlayingMetadata = { title, artist, album ->
                 npTitle = title; npArtist = artist; npAlbum = album
                 emitNowPlaying()
             },
             onArtwork = { bytes ->
-                npArtwork = bytes.takeIf { it.isNotEmpty() }
-                emitNowPlaying()
+                // iOS periodically sends image/none as a placeholder before retransmitting
+                // the current JPEG. Treat an empty body as "no update" to avoid flashing.
+                if (bytes.isNotEmpty() && !npArtwork.contentEquals(bytes)) {
+                    npArtwork = bytes
+                    emitNowPlaying()
+                }
             },
             onVideoPlay = { url, start -> startUrlVideo(url, start) },
             onVideoRate = { rate -> urlVideoPlayer?.setRate(rate) },
@@ -269,7 +410,8 @@ class AirPlayReceiver(
             onRemoteControlInfo = { dacpId, activeRemote -> dacpClient.configure(dacpId, activeRemote) },
             pinAuthEnabled = pinAuthEnabled,
             pairingStore = pairingStore,
-            onShowPin = { pin -> onPinChanged(pin) }
+            onShowPin = { pin -> onPinChanged(pin) },
+            onTransientEventSetup = { secret, _ -> startEventChannel(secret) }
         ).also { it.start(scope) }
         Logger.i("RTSP handler started on port 7000 (audioEnabled=$audioEnabled pinAuth=$pinAuthEnabled)")
     }
@@ -441,32 +583,115 @@ class AirPlayReceiver(
         mirrorAesKey = aesKey
         mirrorEcdhSecret = ecdhSecret
         mirrorAesIv = aesIv
-        // Explicit IPv4 wildcard — see RtspHandler.bindRtspSocket() for why.
-        val event = ServerSocket(0, 50, java.net.InetAddress.getByName("0.0.0.0"))
-        eventSocket = event
-        // Accept + drain the event connection. We don't act on events yet, but macOS expects
-        // the advertised event port to be connectable, so keep it open and readable.
-        scope.launch(Dispatchers.IO) {
-            try {
-                event.accept().use { s ->
-                    eventClientSocket = s
-                    Logger.i("Event channel: macOS connected from ${s.inetAddress.hostAddress}")
-                    val buf = ByteArray(4096)
-                    val input = s.getInputStream()
-                    while (isActive && input.read(buf) != -1) { /* drain */ }
-                }
-            } catch (e: Exception) {
-                if (eventSocket != null) Logger.d("Event channel closed")
-            } finally {
-                eventClientSocket = null
-            }
-        }
+        val eventPort = startEventChannel(ecdhSecret)
         // AirPlay 2 NTP is receiver-initiated: poll the sender's timing port so macOS proceeds.
         val ntp = AirPlayNtpClient(remoteAddress, senderTimingPort).also { ntpClient = it; it.start(scope) }
         onSenderNameChanged("AirPlay")
         emitState(ProtocolState.CONNECTED)
-        Logger.i("Mirror keys set; eventPort=${event.localPort} timingPort=${ntp.localPort}")
-        return event.localPort to ntp.localPort
+        Logger.i("Mirror keys set; eventPort=$eventPort timingPort=${ntp.localPort}")
+        return eventPort to ntp.localPort
+    }
+
+    /** Opens and serves the encrypted AirPlay event channel used for MediaRemote commands. */
+    private fun startEventChannel(eventSecret: ByteArray): Int {
+        runCatching { eventClientSocket?.close() }
+        eventClientSocket = null
+        eventCrypto = null
+        senderSupportedRemoteCommands = null
+        senderPlaybackActive = true
+        onRemoteControlCommandsChanged(null)
+        publishRemoteControlAvailability()
+        runCatching { eventSocket?.close() }
+        // Explicit IPv4 wildcard — see RtspHandler.bindRtspSocket() for why.
+        val event = ServerSocket(0, 50, java.net.InetAddress.getByName("0.0.0.0"))
+        eventSocket = event
+        // Accept the encrypted event connection. AirPlay 2's modern transport commands share this
+        // channel; it is separate from both the RTSP control crypto and the optional RC stream.
+        scope.launch(Dispatchers.IO) {
+            var acceptedSocket: Socket? = null
+            try {
+                event.accept().use { s ->
+                    acceptedSocket = s
+                    eventClientSocket = s
+                    val crypto = HapEventCrypto(eventSecret)
+                    eventCrypto = crypto
+                    publishRemoteControlAvailability()
+                    Logger.i("Encrypted AirPlay event channel connected from ${s.inetAddress.hostAddress}")
+                    val info = PlistCodec.decode(
+                        InfoResponder.build(context, mirrorWidth, mirrorHeight, pinAuthEnabled, deviceMode)
+                    ).toMutableMap().apply {
+                        put("name", displayName.ifBlank { get("name") ?: "PhairPlay" })
+                        put("txtAirPlay", buildAirPlayTxtRecord())
+                    }
+                    postEventCommand(s, crypto, mapOf("type" to "updateInfo", "value" to info), "initial updateInfo")
+                    val input = crypto.wrapInput(s.getInputStream())
+                    val reader = RtspRequestReader(maxMessageBytes = 64 * 1024, maxPhotoBytes = 64 * 1024)
+                    while (isActive && !s.isClosed) {
+                        val request = reader.read(input) ?: break
+                        if (request.method.equals("RTSP/1.0", ignoreCase = true)) {
+                            Logger.d("AirPlay event command response: ${request.uri} ${request.protocol}")
+                            continue
+                        }
+                        if (request.bodyBytes.isNotEmpty()) {
+                            runCatching { PlistCodec.decode(request.bodyBytes) }
+                                .onSuccess { event ->
+                                    handleMediaRemoteEvent(event)
+                                    Logger.d("AirPlay event request ${event["type"] ?: request.uri}")
+                                }
+                                .onFailure { Logger.w("Could not decode AirPlay event request body: ${it.message}") }
+                        } else {
+                            Logger.d("AirPlay event request ${request.method} ${request.uri}")
+                        }
+                        val cseq = request.headers.entries.firstOrNull { it.key.equals("CSeq", ignoreCase = true) }?.value
+                        val response = buildString {
+                            append("RTSP/1.0 200 OK\r\n")
+                            if (cseq != null) append("CSeq: $cseq\r\n")
+                            append("Content-Length: 0\r\n\r\n")
+                        }
+                        crypto.write(s.getOutputStream(), response.toByteArray(Charsets.US_ASCII))
+                    }
+                }
+            } catch (e: Exception) {
+                if (eventSocket != null) Logger.d("Event channel closed")
+            } finally {
+                if (acceptedSocket != null && eventClientSocket === acceptedSocket) {
+                    eventClientSocket = null
+                    eventCrypto = null
+                    onRemoteControlCommandsChanged(null)
+                    publishRemoteControlAvailability()
+                }
+            }
+        }
+        return event.localPort
+    }
+
+    /** Reads the sender's advertised transport capabilities and playback-rate state. */
+    private fun handleMediaRemoteEvent(event: Map<String, Any?>) {
+        when (event["type"] as? String) {
+            "updateMRSupportedCommands" -> {
+                val params = event["params"] as? Map<*, *> ?: return
+                val serialized = params["mrSupportedCommandsFromSender"] as? List<*> ?: return
+                val commands = serialized.mapNotNull { item ->
+                    val bytes = item as? ByteArray ?: return@mapNotNull null
+                    val info = runCatching { PlistCodec.decode(bytes) }.getOrNull() ?: return@mapNotNull null
+                    val command = (info["kCommandInfoCommandKey"] as? Number)?.toInt()
+                        ?: return@mapNotNull null
+                    val enabled = info["kCommandInfoEnabledKey"] as? Boolean ?: true
+                    command.takeIf { enabled }
+                }.toSet()
+                senderSupportedRemoteCommands = commands
+                onRemoteControlCommandsChanged(commands)
+                Logger.i("Sender advertises enabled MediaRemote commands=$commands")
+            }
+            "updateMRNowPlayingInfo" -> {
+                val envelope = event["params"] as? Map<*, *> ?: return
+                val info = envelope["params"] as? Map<*, *> ?: return
+                val rate = (info["PlaybackRate"] as? Number)?.toDouble() ?: return
+                senderPlaybackActive = rate > 0.0
+                onRemotePlaybackChanged(senderPlaybackActive)
+                Logger.i("Sender playback rate=$rate; playing=${rate > 0.0}")
+            }
+        }
     }
 
     /**
@@ -538,12 +763,13 @@ class AirPlayReceiver(
     }
 
     /** Starts the AirPlay 2 buffered audio-only stream (type 103, Apple Music → TV); returns its TCP port. */
-    private fun startBufferedAudio(): Int {
+    private fun startBufferedAudio(sessionKey: ByteArray, audioFormat: Long, samplesPerFrame: Int): Int {
         bufferedAudioServer?.stop()
-        val server = BufferedAudioServer().also { bufferedAudioServer = it; it.start(scope) }
+        val server = BufferedAudioServer(context, sessionKey, audioFormat, samplesPerFrame)
+            .also { bufferedAudioServer = it; it.setVolume(airplayVolumeDb); it.start(scope) }
         audioPlaying = true   // buffered audio (type 103) is always audio-only
         emitNowPlaying()
-        Logger.i("Buffered audio server started: dataPort=${server.dataPort}")
+        Logger.i("Buffered audio server started: dataPort=${server.dataPort}, format=0x${audioFormat.toString(16)}")
         return server.dataPort
     }
 
@@ -559,6 +785,9 @@ class AirPlayReceiver(
 
     /** Clears the video NAL callback, closes the audio socket, and releases media components. */
     private fun releaseMediaComponents() {
+        // Keep the RTSP session's PTP clock alive across stream-level TEARDOWN/SETUP.
+        // iOS commonly re-creates type 103 on pause/resume without sending SETPEERS again;
+        // stopping PTP here makes the resumed stream fall back to unsynchronized playback.
         rtspHandler?.onVideoNalUnit = null
         try { audioSocket?.close() } catch (e: Exception) { /* non-fatal */ }
         audioSocket = null
@@ -574,6 +803,10 @@ class AirPlayReceiver(
         ntpClient = null
         try { eventClientSocket?.close() } catch (e: Exception) { /* non-fatal */ }
         eventClientSocket = null
+        eventCrypto = null
+                    senderSupportedRemoteCommands = null
+                    senderPlaybackActive = true
+        publishRemoteControlAvailability()
         try { eventSocket?.close() } catch (e: Exception) { /* non-fatal */ }
         eventSocket = null
         // Clear the FairPlay/ECDH keys on FULL teardown only. This method runs on a genuine session

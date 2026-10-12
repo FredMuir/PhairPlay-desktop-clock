@@ -1,6 +1,8 @@
 package com.phairplay.ui
 
 import android.app.AlertDialog
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import com.phairplay.service.ServiceController
 import android.text.InputFilter
@@ -10,13 +12,18 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.SwitchCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.phairplay.BuildConfig
 import com.phairplay.R
 import com.phairplay.settings.AppSettings
+import com.phairplay.settings.AirPlayDeviceMode
 import com.phairplay.settings.SettingsRepository
 import com.phairplay.util.Logger
 import kotlinx.coroutines.flow.first
@@ -37,6 +44,16 @@ import kotlinx.coroutines.launch
  */
 class SettingsFragment : Fragment() {
 
+    private val calendarPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            setToggle(rowWidgetAgenda, true)
+            save { it.copy(nowPlayingAgendaEnabled = true) }
+        } else {
+            setToggle(rowWidgetAgenda, false)
+            Toast.makeText(requireContext(), R.string.setting_widget_agenda_permission_denied, Toast.LENGTH_LONG).show()
+        }
+    }
+
     private lateinit var settingsRepository: SettingsRepository
 
     // Section header TextViews — set via include layout tag IDs
@@ -54,10 +71,28 @@ class SettingsFragment : Fragment() {
     private lateinit var rowMiracast: View
     private lateinit var rowCast: View
     private lateinit var rowMirrorAudio: View
+    private lateinit var rowDeviceMode: View
+    private lateinit var seekAudioSync: SeekBar
+    private lateinit var textAudioSyncValue: TextView
+    private lateinit var textDeviceModeValue: TextView
     private lateinit var rowPinAuth: View
     private lateinit var rowStartOnBoot: View
     private lateinit var rowDebugOverlay: View
     private lateinit var rowForceHighRes: View
+    private lateinit var rowAudioScreenOff: View
+    private lateinit var rowWidgetClock: View
+    private lateinit var rowWidgetDate: View
+    private lateinit var rowWidgetAgenda: View
+    private lateinit var rowWidgetWeather: View
+    private lateinit var rowWidgetStyle: View
+    private lateinit var rowWeatherCity: View
+    private lateinit var rowBedsideClockKeepOn: View
+    private lateinit var rowBedsideClockDim: View
+    private lateinit var rowBedsideClockSeconds: View
+    private lateinit var textWidgetStyleValue: TextView
+    private lateinit var textWeatherCityValue: TextView
+    private lateinit var rowAudioScreenTimeout: View
+    private lateinit var textAudioScreenTimeoutValue: TextView
     private lateinit var textVersionValue: TextView
     private lateinit var rowReset: LinearLayout
 
@@ -92,10 +127,28 @@ class SettingsFragment : Fragment() {
         rowMiracast         = view.findViewById(R.id.row_miracast)
         rowCast             = view.findViewById(R.id.row_cast)
         rowMirrorAudio      = view.findViewById(R.id.row_mirror_audio)
+        rowDeviceMode       = view.findViewById(R.id.row_device_mode)
+        seekAudioSync       = view.findViewById(R.id.seek_audio_sync)
+        textAudioSyncValue  = view.findViewById(R.id.text_audio_sync_value)
+        textDeviceModeValue = view.findViewById(R.id.text_device_mode_value)
         rowPinAuth          = view.findViewById(R.id.row_pin_auth)
         rowStartOnBoot      = view.findViewById(R.id.row_start_on_boot)
         rowDebugOverlay     = view.findViewById(R.id.row_debug_overlay)
         rowForceHighRes     = view.findViewById(R.id.row_force_high_res)
+        rowAudioScreenOff   = view.findViewById(R.id.row_audio_screen_off)
+        rowWidgetClock = view.findViewById(R.id.row_widget_clock)
+        rowWidgetDate = view.findViewById(R.id.row_widget_date)
+        rowWidgetAgenda = view.findViewById(R.id.row_widget_agenda)
+        rowWidgetWeather = view.findViewById(R.id.row_widget_weather)
+        rowWidgetStyle = view.findViewById(R.id.row_widget_style)
+        rowWeatherCity = view.findViewById(R.id.row_weather_city)
+        rowBedsideClockKeepOn = view.findViewById(R.id.row_bedside_clock_keep_on)
+        rowBedsideClockDim = view.findViewById(R.id.row_bedside_clock_dim)
+        rowBedsideClockSeconds = view.findViewById(R.id.row_bedside_clock_seconds)
+        textWidgetStyleValue = view.findViewById(R.id.text_widget_style_value)
+        textWeatherCityValue = view.findViewById(R.id.text_weather_city_value)
+        rowAudioScreenTimeout = view.findViewById(R.id.row_audio_screen_timeout)
+        textAudioScreenTimeoutValue = view.findViewById(R.id.text_audio_screen_timeout_value)
         textVersionValue    = view.findViewById(R.id.text_version_value)
         rowReset            = view.findViewById(R.id.row_reset)
     }
@@ -120,6 +173,14 @@ class SettingsFragment : Fragment() {
         configureToggleRow(rowStartOnBoot,  R.string.setting_start_on_boot,      0)
         configureToggleRow(rowDebugOverlay, R.string.setting_debug_overlay,      R.string.setting_debug_overlay_subtitle)
         configureToggleRow(rowForceHighRes, R.string.setting_force_high_res,      R.string.setting_force_high_res_subtitle)
+        configureToggleRow(rowAudioScreenOff, R.string.setting_audio_screen_off, R.string.setting_audio_screen_off_subtitle)
+        configureToggleRow(rowWidgetClock, R.string.setting_widget_clock, 0)
+        configureToggleRow(rowWidgetDate, R.string.setting_widget_date, 0)
+        configureToggleRow(rowWidgetAgenda, R.string.setting_widget_agenda, R.string.setting_widget_agenda_subtitle)
+        configureToggleRow(rowWidgetWeather, R.string.setting_widget_weather, 0)
+        configureToggleRow(rowBedsideClockKeepOn, R.string.setting_bedside_keep_on, R.string.setting_bedside_keep_on_subtitle)
+        configureToggleRow(rowBedsideClockDim, R.string.setting_bedside_dim, R.string.setting_bedside_dim_subtitle)
+        configureToggleRow(rowBedsideClockSeconds, R.string.setting_bedside_seconds, R.string.setting_bedside_seconds_subtitle)
 
         textVersionValue.text = BuildConfig.VERSION_NAME
     }
@@ -165,10 +226,26 @@ class SettingsFragment : Fragment() {
         setToggle(rowMiracast,     settings.miracastEnabled)
         setToggle(rowCast,         settings.castEnabled)
         setToggle(rowMirrorAudio,  settings.mirrorAudioEnabled)
+        textDeviceModeValue.text = getString(if (settings.deviceMode == AirPlayDeviceMode.HOMEPOD) R.string.device_mode_homepod else R.string.device_mode_apple_tv)
         setToggle(rowPinAuth,      settings.airPlayPinAuthEnabled)
         setToggle(rowStartOnBoot,  settings.startOnBoot)
         setToggle(rowDebugOverlay, settings.showDebugOverlay)
         setToggle(rowForceHighRes, settings.forceHighResolution)
+        setToggle(rowAudioScreenOff, settings.audioScreenOffEnabled)
+        setToggle(rowWidgetClock, settings.nowPlayingClockEnabled)
+        setToggle(rowWidgetDate, settings.nowPlayingDateEnabled)
+        setToggle(rowWidgetAgenda, settings.nowPlayingAgendaEnabled)
+        setToggle(rowWidgetWeather, settings.nowPlayingWeatherEnabled)
+        setToggle(rowBedsideClockKeepOn, settings.bedsideClockKeepScreenOn)
+        setToggle(rowBedsideClockDim, settings.bedsideClockDimScreen)
+        setToggle(rowBedsideClockSeconds, settings.bedsideClockShowSeconds)
+        textWidgetStyleValue.setText(if (settings.nowPlayingWidgetStyle == "CARD") R.string.setting_widget_style_card else R.string.setting_widget_style_minimal)
+        textWeatherCityValue.text = settings.weatherCity.ifBlank { getString(R.string.setting_weather_not_set) }
+        textAudioScreenTimeoutValue.text = getString(R.string.setting_audio_screen_timeout_value, settings.audioScreenOffTimeoutMinutes)
+        rowAudioScreenTimeout.isEnabled = settings.audioScreenOffEnabled
+        rowAudioScreenTimeout.alpha = if (settings.audioScreenOffEnabled) 1f else 0.45f
+        seekAudioSync.progress = settings.audioSyncOffsetMs.coerceIn(-250, 250) + 250
+        updateAudioSyncLabel(settings.audioSyncOffsetMs)
     }
 
     private fun setToggle(row: View, value: Boolean) {
@@ -184,6 +261,23 @@ class SettingsFragment : Fragment() {
      */
     private fun setupListeners() {
         rowDisplayName.setOnClickListener { showDisplayNameDialog() }
+        rowWidgetStyle.setOnClickListener { showWidgetStyleDialog() }
+        rowWeatherCity.setOnClickListener { showWeatherCityDialog() }
+        rowDeviceMode.setOnClickListener { showDeviceModeDialog() }
+        rowAudioScreenTimeout.setOnClickListener { showAudioScreenTimeoutDialog() }
+        seekAudioSync.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) updateAudioSyncLabel(progress - 250)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val offsetMs = ((seekBar?.progress ?: 250) - 250).coerceIn(-250, 250)
+                save { it.copy(audioSyncOffsetMs = offsetMs) }
+                Logger.i("Audio sync offset saved: ${offsetMs}ms (negative means earlier)")
+            }
+        })
 
         setToggleListener(rowAirPlay)      { enabled -> save { it.copy(airPlayEnabled = enabled) } }
         setToggleListener(rowMiracast)     { enabled -> save { it.copy(miracastEnabled = enabled) } }
@@ -193,8 +287,63 @@ class SettingsFragment : Fragment() {
         setToggleListener(rowStartOnBoot)  { enabled -> save { it.copy(startOnBoot = enabled) } }
         setToggleListener(rowDebugOverlay) { enabled -> save { it.copy(showDebugOverlay = enabled) } }
         setToggleListener(rowForceHighRes) { enabled -> save { it.copy(forceHighResolution = enabled) } }
+        setToggleListener(rowAudioScreenOff) { enabled ->
+            save { it.copy(audioScreenOffEnabled = enabled) }
+            rowAudioScreenTimeout.isEnabled = enabled
+            rowAudioScreenTimeout.alpha = if (enabled) 1f else 0.45f
+        }
+        setToggleListener(rowWidgetClock) { enabled -> save { it.copy(nowPlayingClockEnabled = enabled) } }
+        setToggleListener(rowWidgetDate) { enabled -> save { it.copy(nowPlayingDateEnabled = enabled) } }
+        rowWidgetAgenda.setOnClickListener {
+            val switch = rowWidgetAgenda.findViewById<SwitchCompat>(R.id.switch_setting) ?: return@setOnClickListener
+            if (switch.isChecked) {
+                setToggle(rowWidgetAgenda, false)
+                save { it.copy(nowPlayingAgendaEnabled = false) }
+            } else if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
+                setToggle(rowWidgetAgenda, true)
+                save { it.copy(nowPlayingAgendaEnabled = true) }
+            } else {
+                calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+            }
+        }
+        setToggleListener(rowWidgetWeather) { enabled -> save { it.copy(nowPlayingWeatherEnabled = enabled) } }
+        setToggleListener(rowBedsideClockKeepOn) { enabled -> save { it.copy(bedsideClockKeepScreenOn = enabled) } }
+        setToggleListener(rowBedsideClockDim) { enabled -> save { it.copy(bedsideClockDimScreen = enabled) } }
+        setToggleListener(rowBedsideClockSeconds) { enabled -> save { it.copy(bedsideClockShowSeconds = enabled) } }
 
         rowReset.setOnClickListener { resetSettings() }
+    }
+
+    private fun showWidgetStyleDialog() {
+        val labels = arrayOf(getString(R.string.setting_widget_style_minimal), getString(R.string.setting_widget_style_card))
+        AlertDialog.Builder(requireContext()).setTitle(R.string.setting_widget_style)
+            .setSingleChoiceItems(labels, if (textWidgetStyleValue.text == labels[1]) 1 else 0) { dialog, which ->
+                val style = if (which == 1) "CARD" else "MINIMAL"
+                textWidgetStyleValue.text = labels[which]
+                save { it.copy(nowPlayingWidgetStyle = style) }; dialog.dismiss()
+            }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun showWeatherCityDialog() {
+        val input = EditText(requireContext()).apply { setText(if (textWeatherCityValue.text == getString(R.string.setting_weather_not_set)) "" else textWeatherCityValue.text); hint = getString(R.string.setting_weather_city_hint); inputType = InputType.TYPE_CLASS_TEXT }
+        AlertDialog.Builder(requireContext()).setTitle(R.string.setting_weather_city).setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ -> val city = input.text.toString().trim(); textWeatherCityValue.text = city.ifBlank { getString(R.string.setting_weather_not_set) }; save { it.copy(weatherCity = city) } }
+            .setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun showDeviceModeDialog() {
+        val labels = arrayOf(getString(R.string.device_mode_homepod), getString(R.string.device_mode_apple_tv))
+        val current = if (textDeviceModeValue.text == labels[0]) 0 else 1
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.setting_device_mode)
+            .setSingleChoiceItems(labels, current) { dialog, which ->
+                val mode = if (which == 0) AirPlayDeviceMode.HOMEPOD else AirPlayDeviceMode.APPLE_TV
+                textDeviceModeValue.text = labels[which]
+                dialog.dismiss()
+                saveAndRestart { it.copy(deviceMode = mode) }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun setToggleListener(row: View, onChanged: (Boolean) -> Unit) {
@@ -204,6 +353,14 @@ class SettingsFragment : Fragment() {
             val newValue = !switch.isChecked
             switch.isChecked = newValue
             onChanged(newValue)
+        }
+    }
+
+    private fun updateAudioSyncLabel(offsetMs: Int) {
+        textAudioSyncValue.text = when {
+            offsetMs < 0 -> getString(R.string.setting_audio_sync_early, -offsetMs)
+            offsetMs > 0 -> getString(R.string.setting_audio_sync_late, offsetMs)
+            else -> getString(R.string.setting_audio_sync_neutral)
         }
     }
 
@@ -285,16 +442,36 @@ class SettingsFragment : Fragment() {
             .show()
     }
 
-    /**
-     * Resets all settings to defaults and repopulates the UI.
-     * TODO: Add a confirmation dialog before resetting.
-     */
-    private fun resetSettings() {
+    private fun showAudioScreenTimeoutDialog() {
+        val minutes = intArrayOf(1, 2, 3, 5, 10, 15, 30)
         viewLifecycleOwner.lifecycleScope.launch {
-            settingsRepository.resetToDefaults()
-            val defaults = AppSettings.DEFAULT
-            populateUI(defaults)
-            Logger.i("Settings reset to defaults")
+            val current = settingsRepository.settingsFlow.first().audioScreenOffTimeoutMinutes
+            val labels = minutes.map { getString(R.string.setting_audio_screen_timeout_value, it) }.toTypedArray()
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.setting_audio_screen_timeout_dialog)
+                .setSingleChoiceItems(labels, minutes.indexOf(current).coerceAtLeast(0)) { dialog, which ->
+                    val chosen = minutes[which]
+                    save { it.copy(audioScreenOffTimeoutMinutes = chosen) }
+                    textAudioScreenTimeoutValue.text = getString(R.string.setting_audio_screen_timeout_value, chosen)
+                    dialog.dismiss()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
+    }
+
+    private fun resetSettings() {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.setting_reset_defaults)
+            .setMessage(R.string.setting_reset_defaults_message)
+            .setPositiveButton(R.string.setting_reset_confirm) { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsRepository.resetToDefaults()
+                    populateUI(AppSettings.DEFAULT)
+                    Logger.i("Settings reset to defaults")
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 }

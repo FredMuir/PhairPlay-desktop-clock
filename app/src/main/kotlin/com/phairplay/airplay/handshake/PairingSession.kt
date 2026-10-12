@@ -22,6 +22,9 @@ import javax.crypto.spec.SecretKeySpec
  */
 class PairingSession(private val keys: PairingKeys) {
 
+    private var transientSetup: HapTransientPairSetup? = null
+    @Volatile private var transientControlSecret: ByteArray? = null
+
     private var ecdhOursPublic: ByteArray? = null
     private var ecdhTheirsPublic: ByteArray? = null
     private var edTheirsPublic: ByteArray? = null
@@ -34,10 +37,28 @@ class PairingSession(private val keys: PairingKeys) {
         private set
 
     /** POST /pair-setup → our 32-byte Ed25519 public key. */
-    fun pairSetup(requestBody: ByteArray): ByteArray {
+    fun pairSetup(requestBody: ByteArray, hkpVersion: String? = null): ByteArray {
+        if (hkpVersion == "4") {
+            var state: Int? = null
+            var p = 0
+            while (p + 2 <= requestBody.size) {
+                val tag = requestBody[p].toInt() and 0xff
+                val length = requestBody[p + 1].toInt() and 0xff
+                if (p + 2 + length > requestBody.size) break
+                if (tag == 6 && length == 1) state = requestBody[p + 2].toInt() and 0xff
+                p += 2 + length
+            }
+            require(state != null) { "transient pair-setup TLV missing state" }
+            if (state == 1) transientSetup = HapTransientPairSetup()
+            val step = (transientSetup ?: error("transient pair-setup M3 without M1")).handle(requestBody)
+            transientControlSecret = step.controlSecret ?: transientControlSecret
+            return step.response
+        }
         require(requestBody.size == 32) { "pair-setup expects 32 bytes, got ${requestBody.size}" }
         return keys.edPublic
     }
+
+    fun takeTransientControlSecret(): ByteArray? = transientControlSecret.also { transientControlSecret = null }
 
     /** POST /pair-verify → dispatch on the leading state byte (1 = M1, 0 = M2). */
     fun pairVerify(body: ByteArray): ByteArray {

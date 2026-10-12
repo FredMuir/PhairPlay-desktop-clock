@@ -72,7 +72,7 @@ internal class RtspRequestReader(
         uri: String,
         headers: Map<String, String>
     ): ByteArray? {
-        val contentLength = headers["Content-Length"]?.toIntOrNull() ?: 0
+        val contentLength = headers.header("Content-Length")?.toIntOrNull() ?: 0
         val bodyLimit = if (method == "PUT" && uri.substringBefore("?") == PhotoHandler.PHOTO_PATH) {
             maxPhotoBytes
         } else {

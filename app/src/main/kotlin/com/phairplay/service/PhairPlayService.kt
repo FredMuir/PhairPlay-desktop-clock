@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.media.AudioManager
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * PhairPlayService — Android ForegroundService that hosts all receiver protocols.
@@ -54,6 +56,16 @@ import kotlinx.coroutines.launch
  *   ACTION_RESTART — stops then starts all receivers (service keeps running)
  */
 class PhairPlayService : Service() {
+
+    /** Keep media-volume changes mirrored while the activity is backgrounded or the screen is off. */
+    private val mediaVolumeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", AudioManager.STREAM_MUSIC) == AudioManager.STREAM_MUSIC) {
+                publishSystemMediaVolume()
+            }
+        }
+    }
+    private var mediaVolumeReceiverRegistered = false
 
     // Binder for Activity binding (returns this service directly)
     private val binder = LocalBinder()
@@ -85,6 +97,18 @@ class PhairPlayService : Service() {
     private val _nowPlaying = MutableStateFlow<com.phairplay.airplay.NowPlayingInfo?>(null)
     val nowPlaying: StateFlow<com.phairplay.airplay.NowPlayingInfo?> = _nowPlaying.asStateFlow()
 
+    private val _outputVolumeDb = MutableStateFlow(0f)
+    val outputVolumeDb: StateFlow<Float> = _outputVolumeDb.asStateFlow()
+
+    private val _remoteControlAvailable = MutableStateFlow(false)
+    val remoteControlAvailable: StateFlow<Boolean> = _remoteControlAvailable.asStateFlow()
+
+    private val _remoteControlCommands = MutableStateFlow<Set<Int>?>(null)
+    val remoteControlCommands: StateFlow<Set<Int>?> = _remoteControlCommands.asStateFlow()
+
+    private val _remotePlaybackActive = MutableStateFlow(true)
+    val remotePlaybackActive: StateFlow<Boolean> = _remotePlaybackActive.asStateFlow()
+
     // Non-null while a PIN should be shown on screen for SRP pair-setup (PIN access control).
     private val _pairingPin = MutableStateFlow<String?>(null)
     val pairingPin: StateFlow<String?> = _pairingPin.asStateFlow()
@@ -111,9 +135,14 @@ class PhairPlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         Logger.i("PhairPlayService created")
+        val volumeFilter = android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(mediaVolumeReceiver, volumeFilter, Context.RECEIVER_EXPORTED)
+        else @Suppress("DEPRECATION") registerReceiver(mediaVolumeReceiver, volumeFilter)
+        mediaVolumeReceiverRegistered = true
         settingsRepository = SettingsRepository(applicationContext)
         createNotificationChannel()
         registerNetworkCallback()
+        publishSystemMediaVolume()
     }
 
     /**
@@ -220,8 +249,60 @@ class PhairPlayService : Service() {
         airPlayReceiver?.sendRemoteCommand(command)
     }
 
+    /** Aligns AirPlay and the card slider with Android's shared media stream volume. */
+    fun setAirPlayOutputVolumeDb(volumeDb: Float) {
+        val receiver = airPlayReceiver
+        if (receiver != null) receiver.setOutputVolumeDb(volumeDb)
+        else applySystemMediaVolumeDb(volumeDb)
+    }
+
+    private fun applySystemMediaVolumeDb(volumeDb: Float) {
+        val audio = getSystemService(AudioManager::class.java)
+        val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(min + 1)
+        val span = max - min
+        // AirPlay reserves -144 dB for mute; every other value, including its -30 dB
+        // slider floor, must stay above Android's fully-muted index.
+        val index = if (volumeDb <= -144f) min else {
+            val nonMutedSteps = (span - 1).coerceAtLeast(1)
+            (min + 1 + airPlayVolumeToFraction(volumeDb) * nonMutedSteps)
+                .roundToInt().coerceIn(min + 1, max)
+        }
+        runCatching { audio.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0) }
+            .onFailure { Logger.w("Could not change Android media volume: ${it.message}") }
+        Logger.i("AirPlay volume=${"%.2f".format(volumeDb)} dB -> Android media index=$index/$max")
+        publishSystemMediaVolume()
+    }
+
+    /** Refreshes the card value after the user changes media volume with hardware/system controls. */
+    fun publishSystemMediaVolume() {
+        val audio = getSystemService(AudioManager::class.java)
+        val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(min + 1)
+        val index = audio.getStreamVolume(AudioManager.STREAM_MUSIC).coerceIn(min, max)
+        val volumeDb = if (index <= min) -144f else {
+            val nonMutedSteps = (max - min - 1).coerceAtLeast(1)
+            val fraction = ((index - min - 1).toFloat() / nonMutedSteps).coerceIn(0f, 1f)
+            airPlayFractionToVolume(fraction)
+        }
+        _outputVolumeDb.value = volumeDb
+        airPlayReceiver?.syncOutputVolumeFromSystem(volumeDb)
+        Logger.i("Android media volume=$index/$max -> AirPlay volume=${"%.2f".format(volumeDb)} dB")
+    }
+
+    /** AirPlay speaker volume is a linear slider over -30..0 dB; -144 dB is its mute sentinel. */
+    private fun airPlayVolumeToFraction(db: Float): Float =
+        if (db <= -144f) 0f else ((db.coerceIn(-30f, 0f) + 30f) / 30f)
+
+    private fun airPlayFractionToVolume(fraction: Float): Float =
+        if (fraction <= 0f) -144f else -30f + fraction.coerceIn(0f, 1f) * 30f
+
     override fun onDestroy() {
         Logger.i("PhairPlayService destroying")
+        if (mediaVolumeReceiverRegistered) {
+            runCatching { unregisterReceiver(mediaVolumeReceiver) }
+            mediaVolumeReceiverRegistered = false
+        }
         unregisterNetworkCallback()
         stopAllReceiversInternal()
         serviceJob.cancel()
@@ -310,6 +391,7 @@ class PhairPlayService : Service() {
             mirrorWidth = settings.mirrorWidth,
             mirrorHeight = settings.mirrorHeight,
             audioEnabled = settings.mirrorAudioEnabled,
+            deviceMode = settings.deviceMode,
             pinAuthEnabled = settings.airPlayPinAuthEnabled,
             // Delegate to the current provider at call time — captures the field, not a fixed value.
             // When MainActivity calls setVideoSurfaceProvider(), future surface requests use it.
@@ -329,10 +411,25 @@ class PhairPlayService : Service() {
             },
             onNowPlayingChanged = { info ->
                 _nowPlaying.value = info
+                if (info == null) {
+                    _remoteControlAvailable.value = false
+                    _remoteControlCommands.value = null
+                    _remotePlaybackActive.value = true
+                }
             },
+            onOutputVolumeChanged = { volumeDb ->
+                applySystemMediaVolumeDb(volumeDb)
+            },
+            initialOutputVolumeDb = _outputVolumeDb.value,
             onPinChanged = { pin ->
                 _pairingPin.value = pin
             },
+            onRemoteControlAvailabilityChanged = { available ->
+                _remoteControlAvailable.value = available
+                Logger.i("DACP transport controls ${if (available) "ready" else "unavailable"}")
+            },
+            onRemoteControlCommandsChanged = { commands -> _remoteControlCommands.value = commands },
+            onRemotePlaybackChanged = { playing -> _remotePlaybackActive.value = playing },
             onStateChanged = { state ->
                 _airPlayState.value = state
                 when (state) {

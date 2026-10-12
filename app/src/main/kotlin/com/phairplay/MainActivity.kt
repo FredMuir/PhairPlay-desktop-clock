@@ -3,11 +3,16 @@ package com.phairplay
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
+import android.database.ContentObserver
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.view.View
@@ -27,6 +32,7 @@ import com.phairplay.ui.NowPlayingScreen
 import com.phairplay.ui.PhotoScreen
 import com.phairplay.ui.PinScreen
 import com.phairplay.ui.SettingsFragment
+import com.phairplay.ui.DevicesFragment
 import com.phairplay.ui.StreamingScreen
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -52,9 +58,22 @@ import timber.log.Timber
  */
 class MainActivity : AppCompatActivity() {
 
+    private val mediaVolumeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) { service?.publishSystemMediaVolume() }
+    }
+    private val mediaVolumeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", android.media.AudioManager.STREAM_MUSIC) == android.media.AudioManager.STREAM_MUSIC) {
+                service?.publishSystemMediaVolume()
+            }
+        }
+    }
+
     // UI references
     private lateinit var navItemHome: TextView
     private lateinit var navItemSettings: TextView
+    private lateinit var navItemDevices: TextView
+    private lateinit var navItemNowPlaying: TextView
     private lateinit var contentContainer: FrameLayout
     private lateinit var streamingContainer: FrameLayout
 
@@ -71,6 +90,23 @@ class MainActivity : AppCompatActivity() {
     private var currentPhotoFrame: PhotoFrame? = null
     private var currentNowPlaying: NowPlayingInfo? = null
     private var currentPin: String? = null
+    private var nowPlayingDismissed = false
+    private var audioScreenOffEnabled = true
+    private var audioScreenOffTimeoutMinutes = 1
+    private var nowPlayingWasVisible = false
+    private var audioScreenSleepExpired = false
+    private var bedsideClockRequested = false
+    private var bedsideKeepScreenOn = true
+    private var bedsideDimScreen = true
+    private var previousBrightness: Float? = null
+    private var bedsideImmersive = false
+    private val screenHandler = Handler(Looper.getMainLooper())
+    private val allowAudioScreenOff = Runnable {
+        if (currentNowPlaying != null && audioScreenOffEnabled && nowPlayingScreen.visibility == View.VISIBLE) {
+            audioScreenSleepExpired = true
+            setKeepScreenOn(false)
+        }
+    }
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -80,6 +116,7 @@ class MainActivity : AppCompatActivity() {
 
             // Wire the streaming Surface so the service can pass it to VideoDecoder
             service?.setVideoSurfaceProvider { getVideoSurface() }
+            service?.publishSystemMediaVolume()
 
             // Show/hide the full-screen overlay for video streams and photos.
             observeOverlayState()
@@ -97,6 +134,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC)
         setContentView(R.layout.activity_main)
 
         Timber.d("MainActivity created")
@@ -121,6 +159,22 @@ class MainActivity : AppCompatActivity() {
         // Bind so we can observe StateFlows and supply the video Surface
         val intent = Intent(this, PhairPlayService::class.java)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onResume() {
+        super.onResume()
+        contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, mediaVolumeObserver)
+        val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(mediaVolumeReceiver, filter, Context.RECEIVER_EXPORTED)
+        else registerReceiver(mediaVolumeReceiver, filter)
+        service?.publishSystemMediaVolume()
+    }
+
+    override fun onPause() {
+        runCatching { contentResolver.unregisterContentObserver(mediaVolumeObserver) }
+        runCatching { unregisterReceiver(mediaVolumeReceiver) }
+        super.onPause()
     }
 
     override fun onStop() {
@@ -153,6 +207,8 @@ class MainActivity : AppCompatActivity() {
     private fun bindViews() {
         navItemHome       = findViewById(R.id.nav_item_home)
         navItemSettings   = findViewById(R.id.nav_item_settings)
+        navItemDevices    = findViewById(R.id.nav_item_devices)
+        navItemNowPlaying = findViewById(R.id.nav_item_now_playing)
         contentContainer  = findViewById(R.id.content_container)
         streamingContainer = findViewById(R.id.streaming_container)
     }
@@ -165,6 +221,10 @@ class MainActivity : AppCompatActivity() {
         streamingScreen = StreamingScreen(this)
         photoScreen = PhotoScreen(this)
         nowPlayingScreen = NowPlayingScreen(this)
+        nowPlayingScreen.setVolumeChangeHandler { volumeDb ->
+            service?.setAirPlayOutputVolumeDb(volumeDb)
+        }
+        nowPlayingScreen.setReturnToAppHandler { dismissNowPlayingCard() }
         pinScreen = PinScreen(this)
         streamingContainer.addView(streamingScreen)
         streamingContainer.addView(photoScreen)
@@ -190,10 +250,33 @@ class MainActivity : AppCompatActivity() {
                 navigateTo(SettingsFragment(), navItemSettings)
             }
         }
+        navItemDevices.setOnClickListener {
+            if (selectedNavIndex != 2) navigateTo(DevicesFragment(), navItemDevices)
+        }
+        navItemNowPlaying.setOnClickListener {
+            if (currentNowPlaying != null) {
+                val info = currentNowPlaying!!
+                nowPlayingDismissed = false
+                showNowPlayingScreen(info)
+            } else {
+                showBedsideClockScreen()
+            }
+        }
+
+        listOf(navItemHome, navItemSettings, navItemDevices, navItemNowPlaying).forEach { item ->
+            item.setOnFocusChangeListener { view, _ ->
+                val navItem = view as TextView
+                navItem.setTextColor(getColor(
+                    if (navItem.isSelected || navItem.hasFocus()) R.color.text_primary else R.color.nav_item_normal
+                ))
+            }
+        }
 
         // Set initial selected state
         setNavSelected(navItemHome, true)
         setNavSelected(navItemSettings, false)
+        setNavSelected(navItemDevices, false)
+        setNavSelected(navItemNowPlaying, false)
     }
 
     /**
@@ -207,7 +290,9 @@ class MainActivity : AppCompatActivity() {
         // Update nav highlight
         setNavSelected(navItemHome, navItem == navItemHome)
         setNavSelected(navItemSettings, navItem == navItemSettings)
-        selectedNavIndex = if (navItem == navItemHome) 0 else 1
+        setNavSelected(navItemDevices, navItem == navItemDevices)
+        setNavSelected(navItemNowPlaying, navItem == navItemNowPlaying)
+        selectedNavIndex = when (navItem) { navItemHome -> 0; navItemSettings -> 1; navItemDevices -> 2; else -> 3 }
 
         // Replace fragment
         supportFragmentManager.beginTransaction()
@@ -224,7 +309,7 @@ class MainActivity : AppCompatActivity() {
     private fun setNavSelected(item: TextView, selected: Boolean) {
         item.isSelected = selected
         item.setTextColor(
-            getColor(if (selected) R.color.text_primary else R.color.nav_item_normal)
+            getColor(if (selected || item.hasFocus()) R.color.text_primary else R.color.nav_item_normal)
         )
     }
 
@@ -235,6 +320,8 @@ class MainActivity : AppCompatActivity() {
      * Hides the nav panel and content area to give the stream the full screen.
      */
     fun showStreamingScreen() {
+        screenHandler.removeCallbacks(allowAudioScreenOff)
+        nowPlayingWasVisible = false
         photoScreen.visibility = View.GONE
         nowPlayingScreen.visibility = View.GONE
         nowPlayingScreen.clear()
@@ -247,6 +334,8 @@ class MainActivity : AppCompatActivity() {
 
     fun showPhotoScreen(photoFrame: PhotoFrame) {
         if (photoScreen.showPhoto(photoFrame.bytes)) {
+            screenHandler.removeCallbacks(allowAudioScreenOff)
+            nowPlayingWasVisible = false
             streamingScreen.visibility = View.GONE
             nowPlayingScreen.visibility = View.GONE
             pinScreen.visibility = View.GONE
@@ -259,6 +348,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Shows the audio-only now-playing card (AirPlay audio with no video). */
     fun showNowPlayingScreen(info: NowPlayingInfo) {
+        nowPlayingScreen.setBedsideClockMode(false)
         nowPlayingScreen.update(info)
         streamingScreen.visibility = View.GONE
         photoScreen.visibility = View.GONE
@@ -266,8 +356,18 @@ class MainActivity : AppCompatActivity() {
         nowPlayingScreen.visibility = View.VISIBLE
         streamingContainer.visibility = View.VISIBLE
         streamingContainer.bringToFront()
-        // Audio-only too: the sender is streaming, so the TV must not doze off mid-track.
-        setKeepScreenOn(true)
+        setImmersiveBars(true)
+        if (!nowPlayingWasVisible) {
+            nowPlayingWasVisible = true
+            audioScreenSleepExpired = false
+            scheduleAudioScreenOff()
+        }
+        if (!audioScreenOffEnabled) {
+            screenHandler.removeCallbacks(allowAudioScreenOff)
+            setKeepScreenOn(true)
+        } else if (!audioScreenSleepExpired) {
+            setKeepScreenOn(true)
+        }
     }
 
     /**
@@ -275,6 +375,8 @@ class MainActivity : AppCompatActivity() {
      * Called when a stream ends.
      */
     fun hideStreamingScreen() {
+        screenHandler.removeCallbacks(allowAudioScreenOff)
+        nowPlayingWasVisible = false
         photoScreen.clearPhoto()
         photoScreen.visibility = View.GONE
         nowPlayingScreen.clear()
@@ -283,6 +385,68 @@ class MainActivity : AppCompatActivity() {
         streamingScreen.visibility = View.VISIBLE
         streamingContainer.visibility = View.GONE
         setKeepScreenOn(false)
+        applyBedsideBrightness(false)
+        setImmersiveBars(false)
+    }
+
+    private fun showBedsideClockScreen() {
+        bedsideClockRequested = true
+        nowPlayingDismissed = false
+        screenHandler.removeCallbacks(allowAudioScreenOff)
+        streamingScreen.visibility = View.GONE
+        photoScreen.visibility = View.GONE
+        pinScreen.visibility = View.GONE
+        nowPlayingScreen.clear()
+        nowPlayingScreen.setBedsideClockMode(true)
+        nowPlayingScreen.visibility = View.VISIBLE
+        streamingContainer.visibility = View.VISIBLE
+        streamingContainer.bringToFront()
+        setKeepScreenOn(bedsideKeepScreenOn)
+        applyBedsideBrightness(true)
+        setImmersiveBars(true)
+    }
+
+    private fun applyBedsideBrightness(enabled: Boolean) {
+        val attrs = window.attributes
+        if (enabled && bedsideDimScreen) {
+            if (previousBrightness == null) previousBrightness = attrs.screenBrightness
+            attrs.screenBrightness = 0.10f
+            window.attributes = attrs
+        } else if (previousBrightness != null) {
+            attrs.screenBrightness = previousBrightness!!
+            window.attributes = attrs
+            previousBrightness = null
+        }
+    }
+
+    private fun setImmersiveBars(enabled: Boolean) {
+        if (bedsideImmersive == enabled) return
+        bedsideImmersive = enabled
+        if (enabled) window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        applySystemBarVisibility(enabled)
+    }
+
+    private fun applySystemBarVisibility(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let { controller ->
+                if (enabled) {
+                    controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                } else controller.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+            }
+        }
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = if (enabled) (
+                View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            ) else View.SYSTEM_UI_FLAG_VISIBLE
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && bedsideImmersive) applySystemBarVisibility(true)
     }
 
     /**
@@ -305,6 +469,44 @@ class MainActivity : AppCompatActivity() {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         Timber.d("Keep-screen-on: $keepOn")
+    }
+
+    private fun scheduleAudioScreenOff() {
+        screenHandler.removeCallbacks(allowAudioScreenOff)
+        if (audioScreenOffEnabled) {
+            audioScreenSleepExpired = false
+            screenHandler.postDelayed(allowAudioScreenOff, audioScreenOffTimeoutMinutes * 60_000L)
+        }
+    }
+
+    /** Restart the audio card idle countdown when the user interacts with the screen. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_DOWN && currentNowPlaying != null &&
+            nowPlayingScreen.visibility == View.VISIBLE && audioScreenOffEnabled
+        ) {
+            audioScreenSleepExpired = false
+            setKeepScreenOn(true)
+            scheduleAudioScreenOff()
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun dismissNowPlayingCard() {
+        bedsideClockRequested = false
+        nowPlayingDismissed = true
+        hideStreamingScreen()
+    }
+
+    @Deprecated("Use the now-playing card's return button to return to the app")
+    override fun onBackPressed() {
+        if (nowPlayingScreen.visibility == View.VISIBLE) {
+            dismissNowPlayingCard()
+        } else if (supportFragmentManager.backStackEntryCount == 0) {
+            // Back from the app's root returns to the launcher without stopping the receiver.
+            moveTaskToBack(true)
+        } else {
+            super.onBackPressed()
+        }
     }
 
     /** Returns the SurfaceView Surface for the VideoDecoder. */
@@ -376,6 +578,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             svc.airPlayState.collectLatest { state ->
                 currentAirPlayState = state
+                if (state == ProtocolState.DISABLED && currentNowPlaying == null) nowPlayingDismissed = false
                 updateOverlay()
             }
         }
@@ -388,8 +591,31 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             svc.nowPlaying.collectLatest { info ->
                 currentNowPlaying = info
+                if (info == null) nowPlayingDismissed = false
                 updateOverlay()
             }
+        }
+        lifecycleScope.launch {
+            com.phairplay.settings.SettingsRepository(this@MainActivity).settingsFlow.collectLatest { settings ->
+                audioScreenOffEnabled = settings.audioScreenOffEnabled
+                audioScreenOffTimeoutMinutes = settings.audioScreenOffTimeoutMinutes.coerceIn(1, 30)
+                nowPlayingScreen.setWidgetSettings(settings.nowPlayingClockEnabled, settings.nowPlayingDateEnabled,
+                    settings.nowPlayingAgendaEnabled, settings.nowPlayingWeatherEnabled, settings.weatherCity,
+                    settings.nowPlayingWidgetStyle, settings.bedsideClockShowSeconds)
+                bedsideKeepScreenOn = settings.bedsideClockKeepScreenOn
+                bedsideDimScreen = settings.bedsideClockDimScreen
+                if (bedsideClockRequested) {
+                    setKeepScreenOn(bedsideKeepScreenOn)
+                    applyBedsideBrightness(true)
+                }
+                if (currentNowPlaying != null && nowPlayingScreen.visibility == View.VISIBLE) {
+                    if (audioScreenOffEnabled) scheduleAudioScreenOff()
+                    else { screenHandler.removeCallbacks(allowAudioScreenOff); setKeepScreenOn(true) }
+                }
+            }
+        }
+        lifecycleScope.launch {
+            svc.outputVolumeDb.collectLatest { volumeDb -> nowPlayingScreen.setVolumeDb(volumeDb) }
         }
         lifecycleScope.launch {
             svc.pairingPin.collectLatest { pin ->
@@ -408,7 +634,8 @@ class MainActivity : AppCompatActivity() {
             pin != null -> showPinScreen(pin)
             // Audio-only AirPlay (system audio, Music, podcasts): show the now-playing card instead
             // of the black video surface. Set whenever audio plays without video.
-            nowPlaying != null -> showNowPlayingScreen(nowPlaying)
+            nowPlaying != null -> if (nowPlayingDismissed) hideStreamingScreen() else showNowPlayingScreen(nowPlaying)
+            bedsideClockRequested -> showBedsideClockScreen()
             currentAirPlayState == ProtocolState.CONNECTED -> showStreamingScreen()
             photoFrame != null -> showPhotoScreen(photoFrame)
             else -> hideStreamingScreen()
@@ -424,5 +651,6 @@ class MainActivity : AppCompatActivity() {
         pinScreen.visibility = View.VISIBLE
         streamingContainer.visibility = View.VISIBLE
         streamingContainer.bringToFront()
+        setImmersiveBars(true)
     }
 }

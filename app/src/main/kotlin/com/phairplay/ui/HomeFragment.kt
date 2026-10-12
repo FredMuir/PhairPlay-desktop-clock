@@ -190,6 +190,26 @@ class HomeFragment : Fragment() {
         }
         textServiceState.setText(textRes)
         dotServiceState.background.setTint(requireContext().getColor(colorRes))
+
+        // Keep the visual emphasis aligned with the action that is useful in this state.
+        // Redundant service commands are disabled so a focused TV remote cannot trigger them.
+        val running = state is ServiceState.Running
+        val restarting = state is ServiceState.Restarting
+        val canStart = !running && !restarting
+        val canStop = running && !restarting
+        val canRestart = (running || state is ServiceState.Error) && !restarting
+
+        btnStart.isEnabled = canStart
+        btnStart.setBackgroundResource(if (canStart) R.drawable.btn_service_primary_selector else R.drawable.btn_service_secondary_selector)
+        btnStart.setTextColor(requireContext().getColor(if (canStart) R.color.background_dark else R.color.text_secondary))
+
+        btnStop.isEnabled = canStop
+        btnStop.setBackgroundResource(if (canStop) R.drawable.btn_service_destructive_selector else R.drawable.btn_service_secondary_selector)
+        btnStop.setTextColor(requireContext().getColor(if (canStop) R.color.status_stopped else R.color.text_secondary))
+
+        btnRestart.isEnabled = canRestart
+        btnRestart.setBackgroundResource(R.drawable.btn_service_secondary_selector)
+        btnRestart.setTextColor(requireContext().getColor(R.color.text_primary))
     }
 
     /**

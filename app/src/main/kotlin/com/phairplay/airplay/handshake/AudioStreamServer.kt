@@ -54,7 +54,6 @@ class AudioStreamServer(
 
     // Playback gain (0..1), set from the sender's AirPlay volume. Applied to the AudioTrack and
     // re-applied if the track is recreated. Starts at full.
-    @Volatile private var volumeGain = 1f
 
     // Reused across packets: decryptPacket runs only on the playback thread, so one Cipher
     // instance is safe and avoids a Cipher.getInstance allocation on every packet (~92/s).
@@ -374,10 +373,9 @@ class AudioStreamServer(
         Logger.i("Audio decoder: ${if (isAacLc) "AAC-LC" else "AAC-ELD"} ${sampleRate}Hz x$channels (ct=$codecType)")
     }
 
-    /** Sets playback volume from the sender's AirPlay volume (−30 dB … 0 dB, or ≤ −144 = mute). */
+    /** Android STREAM_MUSIC is the single output gain stage. */
     fun setVolume(airplayVolume: Float) {
-        volumeGain = if (airplayVolume <= -144f) 0f else ((airplayVolume + 30f) / 30f).coerceIn(0f, 1f)
-        runCatching { audioTrack?.setVolume(volumeGain) }
+        runCatching { audioTrack?.setVolume(1f) }
     }
 
     private fun initAudioTrack() {
@@ -406,7 +404,7 @@ class AudioStreamServer(
             .setBufferSizeInBytes(minBuf)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
-            .also { it.setVolume(volumeGain); it.play() }
+            .also { it.setVolume(1f); it.play() }
     }
 
     companion object {
