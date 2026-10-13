@@ -1,14 +1,13 @@
-# PhairPlay Testing Guide
+# PhairPlay Testing Guide / PhairPlay 测试指南
 
-This document explains how to run tests, what is tested, and how to perform manual testing on real devices.
-
-Choose checks based on the changed behavior and target device. UI-only changes can use builds and visual inspection; changes to protocol, audio output, volume, or synchronization require targeted playback checks. A build or screenshot does not establish runtime compatibility, and release acceptance still requires the relevant scenarios below.
+**EN:** This guide explains automated tests, validation coverage and manual checks on real devices. Select checks based on the change and target device. UI-only changes need build and visual inspection; protocol, audio, volume or synchronization changes need targeted playback checks. A successful build or screenshot alone does not establish runtime compatibility.  
+**中文：** 本指南说明自动化测试、验证范围及实体设备手动检查方法。请根据变更内容和目标设备选择检查项：仅修改界面时应构建并目视检查；修改协议、音频输出、音量或同步时还需专项播放检查。构建成功或有截图都不能单独证明运行兼容性。
 
 ---
 
-## Device Validation Record
+## Device Validation Record / 设备验证记录
 
-### 2026-10-13 — Phone and tablet compatibility milestone
+### 2026-10-13 — Phone and tablet compatibility milestone / 手机与平板兼容性阶段
 
 Build: `versionCode 64`, `versionName 1.0.61-tbj607f` (`googletvDebug`).
 
@@ -19,9 +18,19 @@ Build: `versionCode 64`, `versionName 1.0.61-tbj607f` (`googletvDebug`).
 | API 31 tablet emulator | Targeted clock fit test: 1/1 passed. |
 | API 31 phone emulator | A full v64 run was interrupted when the AVD disconnected from ADB during test execution; the targeted clock test had passed before disconnect. |
 
-The OnePlus foreground receiver service kept advertising `_airplay._tcp` and `_raop._tcp` while the display was in doze. This record covers UI, installation, and discovery checks; it does not establish end-to-end AirPlay audio playback on v64.
+**中文对照：**
 
-### Release scope and open issues
+| 设备 / 环境 | 结果 |
+|---|---|
+| Lenovo TB-J607F 实体平板 | 完整 `MainActivityTest` 仪器测试：9/9 通过。 |
+| OnePlus 7 Pro（GM1910），Android 14 | 完整 `MainActivityTest` 仪器测试：9/9 通过。Lenovo 设备列表可发现 OnePlus 接收器。 |
+| API 31 平板模拟器 | 时钟适配专项测试：1/1 通过。 |
+| API 31 手机模拟器 | 完整 v64 测试期间 AVD 与 ADB 断开，测试被中止；断开前时钟专项测试已通过。 |
+
+**EN:** The OnePlus foreground receiver service kept advertising `_airplay._tcp` and `_raop._tcp` while the display was in Doze. This record covers UI, installation and discovery checks; it does not establish end-to-end AirPlay audio playback on v64.  
+**中文：** OnePlus 屏幕进入 Doze 时，前台接收服务仍持续广播 `_airplay._tcp` 和 `_raop._tcp`。本记录覆盖界面、安装及设备发现检查，但不代表 v64 的 AirPlay 音频端到端播放已验证。
+
+### Release scope and open issues / 本版范围与待解决问题
 
 - The API 31 phone emulator's full v64 run lost its ADB connection during test 7. The targeted clock test passed before the disconnect; this is an incomplete run, not a pass for the full suite.
 - AirPlay sender-to-receiver media playback, mirroring, codec interoperability, and multi-room synchronization were not revalidated on v64. Discovery and UI results must not be treated as playback acceptance.
@@ -30,7 +39,18 @@ The OnePlus foreground receiver service kept advertising `_airplay._tcp` and `_r
 - Manufacturer-specific multicast filtering, battery management, unusual aspect ratios, split-screen, and non-default display/font scaling are not exhaustively validated. Discovery may vary by Wi-Fi access point and Android vendor.
 - The v64 device-test APKs were originally signed with different debug certificates. The unified prerelease APK uses the Lenovo certificate; updating an existing OnePlus or emulator installation signed with another certificate requires uninstalling it first, which removes its local app data. All later local debug variants are configured to use the shared Lenovo-derived key.
 
-## How to Run Tests
+**中文对照：**
+
+- API 31 手机模拟器的完整 v64 测试在第 7 项期间失去 ADB 连接。断开前时钟专项测试已通过；完整测试未完成，不能视为整套测试通过。
+- v64 未重新验证 AirPlay 发送端到接收端的媒体播放、镜像、编码器互通或多房间同步。设备发现和界面结果不能代替播放验收。
+- AirPlay 2 缓冲音频（type 103）会被控制路径接受，但目前不会播放。
+- Google Cast 和 Miracast 媒体播放尚未完成，目前实现的是控制/设置路径。
+- 厂商多播过滤、电池管理、特殊宽高比、分屏及非默认显示/字体缩放尚未全面验证。设备发现可能因 Wi-Fi 接入点和 Android 厂商而异。
+- v64 设备测试包最初使用了不同调试证书。统一预发布包使用 Lenovo 证书；若要覆盖由其他证书签名的 OnePlus 或模拟器安装，必须先卸载，这会删除应用本地数据。之后的本地调试变体已配置为共用 Lenovo 派生密钥。
+
+## How to Run Tests / 如何运行测试
+
+**中文：** 下方命令及详细测试步骤是本仓库自动化测试和实体设备手动验证的操作说明。运行 Android 仪器测试前，请先连接设备或启动模拟器，并确认 `adb devices` 能识别目标设备。
 
 ### Unit Tests (no device required)
 
