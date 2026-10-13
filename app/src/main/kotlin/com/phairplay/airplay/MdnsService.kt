@@ -1,9 +1,12 @@
 package com.phairplay.airplay
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
+import android.os.Build
 import com.phairplay.service.ProtocolState
 import com.phairplay.settings.AirPlayDeviceMode
 import com.phairplay.util.Logger
@@ -220,6 +223,7 @@ class MdnsService(
             setAttribute("flags", if (pinAuthEnabled) "0xC" else "0x4")
             if (pinAuthEnabled) setAttribute("pw", "true")
         }
+        bindToWifiNetwork(serviceInfo)
 
         airPlayListener = createRegistrationListener(
             serviceLabel = "_airplay._tcp",
@@ -268,6 +272,7 @@ class MdnsService(
             setAttribute("am", deviceMode.model)
             if (pinAuthEnabled) setAttribute("pw", "true")
         }
+        bindToWifiNetwork(serviceInfo)
 
         raopListener = createRegistrationListener(
             serviceLabel = "_raop._tcp",
@@ -276,6 +281,33 @@ class MdnsService(
             onFailure = { onStateChange(ProtocolState.ERROR) }
         )
         nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, raopListener!!)
+    }
+
+    /**
+     * Android 13+ can publish an NSD service on a specific network. AirPlay is a local Wi-Fi
+     * protocol, so pin both records to the active Wi-Fi network instead of leaving the network
+     * unspecified when the phone also has cellular, VPN, or other transports available.
+     * Android 12 and older keep the platform default behavior for compatibility.
+     */
+    private fun bindToWifiNetwork(serviceInfo: NsdServiceInfo) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return
+        val activeNetwork = connectivity.activeNetwork
+        val activeCapabilities = activeNetwork?.let(connectivity::getNetworkCapabilities)
+        val wifiNetwork = if (activeCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
+            activeNetwork
+        } else {
+            connectivity.allNetworks.firstOrNull { network ->
+                connectivity.getNetworkCapabilities(network)
+                    ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            }
+        }
+        if (wifiNetwork == null) {
+            Logger.w("No Wi-Fi network available for mDNS registration; using platform default")
+            return
+        }
+        serviceInfo.network = wifiNetwork
+        Logger.i("Binding mDNS service ${serviceInfo.serviceType} to Wi-Fi network $wifiNetwork")
     }
 
     /**

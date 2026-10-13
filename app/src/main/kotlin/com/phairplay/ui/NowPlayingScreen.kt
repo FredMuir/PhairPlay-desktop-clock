@@ -69,6 +69,7 @@ class NowPlayingScreen @JvmOverloads constructor(
     private val volumeSlider: SeekBar
     private val volumeTrack: FrameLayout
     private val volumeColumn: LinearLayout
+    private var contentColumn: LinearLayout? = null
     private lateinit var clockView: TextView
     private lateinit var widgets: TextView
     private val widgetHandler = Handler(Looper.getMainLooper())
@@ -83,6 +84,16 @@ class NowPlayingScreen @JvmOverloads constructor(
     private var weatherRetryScheduledFor: String? = null
     private var idleClockMode = false
     private var showClockSeconds = false
+    private var lastLayoutProfile: LayoutProfile? = null
+
+    private data class LayoutProfile(
+        val width: Int,
+        val height: Int,
+        val orientation: Int,
+        val fontScale: Float,
+        val idleClockMode: Boolean,
+        val showClockSeconds: Boolean
+    )
     @Volatile private var weatherText: String? = null
     @Volatile private var agendaText: String? = null
     private var lastWeatherCity = ""
@@ -101,6 +112,8 @@ class NowPlayingScreen @JvmOverloads constructor(
             background = glassBackground(28)
             setTextColor(Color.WHITE)
             setPadding(dp(18), 0, dp(18), 0)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
             setOnClickListener { onReturnToApp?.invoke() }
         }
         addView(returnButton, LayoutParams(LayoutParams.WRAP_CONTENT, dp(52), Gravity.TOP or Gravity.START).apply {
@@ -112,6 +125,7 @@ class NowPlayingScreen @JvmOverloads constructor(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
         }
+        contentColumn = column
         val details = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL or Gravity.START }
 
         artwork = ImageView(context).apply {
@@ -127,12 +141,15 @@ class NowPlayingScreen @JvmOverloads constructor(
         }
 
         clockView = textView(CLOCK_SP, R.color.text_primary).apply {
+            id = R.id.now_playing_clock
             typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
             maxLines = 1
             gravity = Gravity.START
-            setPadding(0, 0, 0, dp(2))
+            // Keep a little trailing room for glyph overhang and OEM TextView differences.
+            setPadding(0, 0, dp(12), dp(2))
         }
         titleView = textView(TITLE_SP, R.color.text_primary, bold = true).apply {
+            id = R.id.now_playing_track_title
             setPadding(0, dp(16), 0, 0)
             minHeight = dp(82)
             maxLines = Int.MAX_VALUE
@@ -154,14 +171,21 @@ class NowPlayingScreen @JvmOverloads constructor(
             gravity = Gravity.CENTER
             textAlignment = View.TEXT_ALIGNMENT_CENTER
             includeFontPadding = false
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            maxWidth = dp(104)
         }
         volumeLabel = textView(VOLUME_SP, R.color.text_secondary).apply {
             text = context.getString(R.string.now_playing_volume_value, 100)
             gravity = Gravity.CENTER
             textAlignment = View.TEXT_ALIGNMENT_CENTER
             includeFontPadding = false
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            maxWidth = dp(88)
         }
         volumeSlider = SeekBar(context).apply {
+            id = R.id.now_playing_volume_slider
             max = 100
             progress = 100
             // Use Android's themed SeekBar and let View's transform handle touch coordinates.
@@ -179,12 +203,14 @@ class NowPlayingScreen @JvmOverloads constructor(
         }
         volumeLabel.textSize = 14f
         volumeColumn = LinearLayout(context).apply {
+            id = R.id.now_playing_volume_column
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             background = glassBackground(30)
             setPadding(dp(4), dp(8), dp(4), dp(8))
         }
         volumeTrack = FrameLayout(context).apply {
+            id = R.id.now_playing_volume_track
             addView(volumeSlider, FrameLayout.LayoutParams(dp(250), dp(44), Gravity.CENTER))
         }
         volumeColumn.addView(volumeCaption, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(22)))
@@ -236,28 +262,33 @@ class NowPlayingScreen @JvmOverloads constructor(
         artistView.visibility = if (idle) View.GONE else View.VISIBLE
         albumView.visibility = if (idle) View.GONE else View.VISIBLE
         volumeColumn.visibility = if (idle) View.GONE else View.VISIBLE
-        clockView.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (idle) 148f else if (isLandscapeUi()) 120f else 84f)
+        contentColumn?.let { if (width > 0) adaptOrientation(it) }
     }
 
     fun setWidgetSettings(clock: Boolean, date: Boolean, agenda: Boolean, weather: Boolean, city: String, style: String, seconds: Boolean = false) {
         clockEnabled = clock; dateEnabled = date; agendaEnabled = agenda; weatherEnabled = weather; weatherCity = city; widgetStyle = style
+        val secondsChanged = showClockSeconds != seconds
         showClockSeconds = seconds
         val weatherNeedsRetry = weatherFailed && !weatherLoadPending && weatherRetryScheduledFor == null
         if (weather && city.isNotBlank() && (city != lastWeatherCity || weatherNeedsRetry)) loadWeather(city)
         refreshWidgets()
+        if (secondsChanged) contentColumn?.let { if (width > 0) adaptOrientation(it) }
     }
 
     private fun refreshWidgets() {
         if (!::widgets.isInitialized) return
         val lines = mutableListOf<String>()
-        val now = java.time.LocalDateTime.now()
         val nowMillis = System.currentTimeMillis()
-        val clockText = if (clockEnabled) now.format(java.time.format.DateTimeFormatter.ofPattern(if (showClockSeconds) "HH:mm:ss" else "HH:mm")) else ""
-        if (clockView.text.toString() != clockText) clockView.text = clockText
-        clockView.visibility = if (clockEnabled) View.VISIBLE else View.GONE
+        val now = java.util.Date(nowMillis)
         val locale = java.util.Locale.getDefault()
-        if (dateEnabled) lines += now.format(java.time.format.DateTimeFormatter.ofPattern(
-            android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMd EEEE"), locale))
+        val clockText = if (clockEnabled) java.text.SimpleDateFormat(
+            if (showClockSeconds) "HH:mm:ss" else "HH:mm", locale).format(now) else ""
+        if (clockView.text.toString() != clockText) {
+            clockView.text = clockText
+        }
+        clockView.visibility = if (clockEnabled) View.VISIBLE else View.GONE
+        if (dateEnabled) lines += java.text.SimpleDateFormat(
+            android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMd EEEE"), locale).format(now)
         if (weatherEnabled) lines += if (weatherCity.isBlank()) context.getString(R.string.now_playing_weather_city_missing)
             else weatherText ?: context.getString(R.string.now_playing_weather_loading, weatherCity)
         if (agendaEnabled) {
@@ -399,76 +430,224 @@ class NowPlayingScreen @JvmOverloads constructor(
         val availableWidth = (width / density).toInt().coerceAtLeast(320)
         val availableWidthDp = availableWidth.toFloat()
         val availableHeight = (height / density).toInt().coerceAtLeast(320)
-        val art = if (landscape) (availableHeight * 0.62f).toInt().coerceIn(300, 440)
-            else (availableWidth * 0.58f).toInt().coerceIn(220, 360)
-        val clockSize = if (idleClockMode) if (landscape) 164f else 112f else if (landscape) 120f else 84f
-        clockView.setTextSize(TypedValue.COMPLEX_UNIT_SP, clockSize)
-        titleView.maxHeight = dp(if (landscape) 118 else 84)
-        (artwork.layoutParams as LinearLayout.LayoutParams).apply { width = dp(art); height = dp(art); artwork.layoutParams = this }
+        // Phone landscape windows have little vertical room. The TV/tablet minimum art
+        // size and type scale otherwise make the centered card extend beyond the screen.
+        val shortLandscape = landscape && availableHeight < 500
+        val layoutProfile = LayoutProfile(
+            width = width,
+            height = height,
+            orientation = resources.configuration.orientation,
+            fontScale = resources.configuration.fontScale,
+            idleClockMode = idleClockMode,
+            showClockSeconds = showClockSeconds
+        )
+        if (layoutProfile == lastLayoutProfile) return
+        val art = if (landscape) (availableHeight * if (shortLandscape) 0.42f else 0.45f).toInt()
+            .coerceIn(if (shortLandscape) 160 else 220, if (shortLandscape) 220 else 360)
+            else minOf((availableWidth * 0.58f).toInt(), ((availableHeight - 230).coerceAtLeast(250) * 0.34f).toInt()).coerceIn(144, 360)
+        val baseClockSize = when {
+            idleClockMode && landscape && shortLandscape -> 112f
+            idleClockMode && landscape -> 164f
+            idleClockMode -> 112f
+            landscape && shortLandscape -> 64f
+            landscape -> 76f
+            else -> 84f
+        }
+        val clockColumnWidthDp = if (landscape) {
+            minOf(1050f, availableWidthDp - 98f - 64f).coerceAtLeast(320f)
+        } else {
+            minOf(500f, availableWidthDp - 32f).coerceAtLeast(240f)
+        }
+        val clockTextWidthDp = when {
+            landscape && idleClockMode -> ((clockColumnWidthDp - 44f - 28f).coerceAtLeast(180f)) * 0.64f
+            landscape -> (clockColumnWidthDp - art - 44f).coerceAtLeast(180f)
+            else -> clockColumnWidthDp
+        }
+        val clockSize = if (showClockSeconds) {
+            // Seconds add three digits and the tablet's landscape bedside layout allocates
+            // the clock a weighted fraction of the content column. Keep extra width in reserve:
+            // a fit based on the nominal advance width can still clip the final digit on device.
+            minOf(baseClockSize, (clockTextWidthDp * 0.18f / resources.configuration.fontScale).coerceAtLeast(48f))
+        } else {
+            baseClockSize
+        }
+        // The timestamp can gain three characters when seconds are enabled. Let TextView
+        // Keep a conservative width for every digit and account for accessibility font scale.
+        // Changing text size only when the layout profile changes avoids a measure/layout loop
+        // while the clock's seconds update once per second.
+        val currentClockSizeSp = clockView.textSize / resources.displayMetrics.scaledDensity
+        if (kotlin.math.abs(currentClockSizeSp - clockSize) > 0.5f) {
+            clockView.setTextSize(TypedValue.COMPLEX_UNIT_SP, clockSize)
+        }
+        val targetTitleMaxHeight = dp(if (shortLandscape) 72 else if (landscape) 170 else 84)
+        if (titleView.maxHeight != targetTitleMaxHeight) titleView.maxHeight = targetTitleMaxHeight
+        (artwork.layoutParams as LinearLayout.LayoutParams).let { params ->
+            val targetArtSize = dp(art)
+            if (params.width != targetArtSize || params.height != targetArtSize) {
+                params.width = targetArtSize
+                params.height = targetArtSize
+                artwork.layoutParams = params
+            }
+        }
         // Keep the content column clear of the volume rail. On wider tablets use the
         // centered 1050dp composition; on narrower landscape windows reserve both the rail
         // and a 32dp gap, then pin the content to the left safe area.
-        val volumeRailReserve = 98f // 80dp rail + 18dp end inset
+        val volumeRailReserve = if (landscape) 98f else 0f // Portrait uses a dedicated bottom volume bar.
         val sideInset = 32f
         val centeredLayoutMinWidth = 1050f + volumeRailReserve + sideInset * 2f
-        val compactLandscape = landscape && availableWidthDp < centeredLayoutMinWidth
+        val compactLandscape = landscape && (availableWidthDp < centeredLayoutMinWidth || availableHeight < 500)
         val contentWidth = when {
             landscape -> minOf(1050f, availableWidthDp - volumeRailReserve - sideInset * 2f).coerceAtLeast(320f)
-            else -> minOf(500f, availableWidthDp).coerceAtLeast(320f)
+            else -> minOf(500f, availableWidthDp - 32f).coerceAtLeast(240f)
         }
         val maxWidth = dp(contentWidth.roundToInt())
         val lp = column.layoutParams as? LayoutParams ?: return
         val desiredGravity = if (compactLandscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
         val desiredMarginStart = if (compactLandscape) dp(sideInset.roundToInt()) else 0
-        if (lp.width != maxWidth || lp.gravity != desiredGravity || lp.marginStart != desiredMarginStart) {
+        val desiredBottomMargin = if (landscape) 0 else dp(78)
+        if (lp.width != maxWidth || lp.gravity != desiredGravity || lp.marginStart != desiredMarginStart || lp.bottomMargin != desiredBottomMargin) {
             lp.width = maxWidth
             lp.gravity = desiredGravity
             lp.marginStart = desiredMarginStart
+            lp.bottomMargin = desiredBottomMargin
             column.layoutParams = lp
         }
         val details = column.getChildAt(1) as? LinearLayout ?: return
-        details.translationY = if (idleClockMode) 0f else dp(if (landscape) -24 else 0).toFloat()
-        (details.layoutParams as LinearLayout.LayoutParams).apply { width = if (landscape) 0 else LayoutParams.MATCH_PARENT; height = LayoutParams.WRAP_CONTENT; weight = if (landscape) 1f else 0f; marginStart = if (landscape) dp(44) else 0; details.layoutParams = this }
+        column.gravity = if (landscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER_HORIZONTAL
+        details.translationY = if (idleClockMode || shortLandscape) 0f else dp(if (landscape) -24 else 0).toFloat()
+        (details.layoutParams as LinearLayout.LayoutParams).let { params ->
+            val targetWidth = if (landscape) 0 else LayoutParams.MATCH_PARENT
+            val targetWeight = if (landscape) 1f else 0f
+            val targetMarginStart = if (landscape) dp(44) else 0
+            if (params.width != targetWidth || params.height != LayoutParams.WRAP_CONTENT ||
+                params.weight != targetWeight || params.marginStart != targetMarginStart
+            ) {
+                params.width = targetWidth
+                params.height = LayoutParams.WRAP_CONTENT
+                params.weight = targetWeight
+                params.marginStart = targetMarginStart
+                details.layoutParams = params
+            }
+        }
         details.orientation = if (bedsideLandscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
         details.gravity = if (landscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
 
         val clockParams = clockView.layoutParams as LinearLayout.LayoutParams
         val widgetsParams = widgets.layoutParams as LinearLayout.LayoutParams
-        if (bedsideLandscape) {
-            clockParams.width = 0
+        val targetClockWidth = if (bedsideLandscape) 0 else LayoutParams.MATCH_PARENT
+        val targetClockWeight = if (bedsideLandscape) 0.64f else 0f
+        val targetClockMargin = if (bedsideLandscape) dp(28) else 0
+        val targetWidgetsWidth = if (bedsideLandscape) 0 else LayoutParams.MATCH_PARENT
+        val targetWidgetsWeight = if (bedsideLandscape) 0.36f else 0f
+        val targetWidgetsMargin = if (bedsideLandscape) dp(28) else 0
+        val clockParamsChanged = clockParams.width != targetClockWidth ||
+            clockParams.height != LayoutParams.WRAP_CONTENT || clockParams.weight != targetClockWeight ||
+            clockParams.marginEnd != targetClockMargin
+        val widgetsParamsChanged = widgetsParams.width != targetWidgetsWidth ||
+            widgetsParams.height != LayoutParams.WRAP_CONTENT || widgetsParams.weight != targetWidgetsWeight ||
+            widgetsParams.marginStart != targetWidgetsMargin
+        if (clockParamsChanged) {
+            clockParams.width = targetClockWidth
             clockParams.height = LayoutParams.WRAP_CONTENT
-            clockParams.weight = 0.64f
-            clockParams.marginEnd = dp(28)
-            widgetsParams.width = 0
+            clockParams.weight = targetClockWeight
+            clockParams.marginEnd = targetClockMargin
+            clockView.layoutParams = clockParams
+        }
+        if (widgetsParamsChanged) {
+            widgetsParams.width = targetWidgetsWidth
             widgetsParams.height = LayoutParams.WRAP_CONTENT
-            widgetsParams.weight = 0.36f
-            widgetsParams.marginStart = dp(28)
-            widgets.textSize = 24f
-            widgets.maxLines = Int.MAX_VALUE
-            widgets.maxHeight = dp(180)
+            widgetsParams.weight = targetWidgetsWeight
+            widgetsParams.marginStart = targetWidgetsMargin
+            widgets.layoutParams = widgetsParams
+        }
+        if (bedsideLandscape) {
+            setWidgetsTextSizeIfChanged(24f)
+            if (widgets.maxLines != Int.MAX_VALUE) widgets.maxLines = Int.MAX_VALUE
+            val targetWidgetsMaxHeight = dp(if (shortLandscape) 96 else 180)
+            if (widgets.maxHeight != targetWidgetsMaxHeight) widgets.maxHeight = targetWidgetsMaxHeight
             widgets.gravity = Gravity.START or Gravity.CENTER_VERTICAL
         } else {
-            clockParams.width = LayoutParams.MATCH_PARENT
-            clockParams.height = LayoutParams.WRAP_CONTENT
-            clockParams.weight = 0f
-            clockParams.marginEnd = 0
-            widgetsParams.width = LayoutParams.MATCH_PARENT
-            widgetsParams.height = LayoutParams.WRAP_CONTENT
-            widgetsParams.weight = 0f
-            widgetsParams.marginStart = 0
-            widgets.textSize = 22f
-            widgets.maxLines = Int.MAX_VALUE
-            widgets.maxHeight = dp(240)
+            setWidgetsTextSizeIfChanged(if (landscape) 18f else 22f)
+            if (widgets.maxLines != Int.MAX_VALUE) widgets.maxLines = Int.MAX_VALUE
+            val targetWidgetsMaxHeight = dp(240)
+            if (widgets.maxHeight != targetWidgetsMaxHeight) widgets.maxHeight = targetWidgetsMaxHeight
             widgets.gravity = Gravity.START
         }
-        clockView.layoutParams = clockParams
-        widgets.layoutParams = widgetsParams
-        titleView.gravity = Gravity.START
-        artistView.gravity = Gravity.START
-        albumView.gravity = Gravity.START
-        details.gravity = Gravity.CENTER_VERTICAL or Gravity.START
-        volumeTrack.layoutParams = LinearLayout.LayoutParams(dp(58), dp(if (landscape) 250 else 168))
-        volumeSlider.layoutParams = FrameLayout.LayoutParams(dp(if (landscape) 250 else 168), dp(44), Gravity.CENTER)
+        val textGravity = if (landscape) Gravity.START else Gravity.CENTER
+        clockView.gravity = textGravity
+        widgets.gravity = textGravity
+        titleView.gravity = textGravity
+        artistView.gravity = textGravity
+        albumView.gravity = textGravity
+        details.gravity = if (landscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
+        volumeColumn.orientation = if (landscape) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        volumeColumn.gravity = Gravity.CENTER
+        volumeColumn.setPadding(if (landscape) dp(4) else dp(12), if (landscape) dp(8) else dp(4), if (landscape) dp(4) else dp(12), if (landscape) dp(8) else dp(4))
+        val volumeParams = volumeColumn.layoutParams as? LayoutParams
+        volumeParams?.let {
+            val targetWidth = if (landscape) dp(80) else LayoutParams.WRAP_CONTENT
+            val targetGravity = if (landscape) Gravity.END or Gravity.CENTER_VERTICAL else Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            val targetEndMargin = if (landscape) dp(18) else 0
+            // Leave room for gesture/three-button navigation when immersive bars are
+            // temporarily visible (for example after a swipe or during Activity launch).
+            val targetBottomMargin = if (landscape) 0 else dp(96)
+            if (it.width != targetWidth || it.gravity != targetGravity || it.marginEnd != targetEndMargin || it.bottomMargin != targetBottomMargin) {
+                it.width = targetWidth
+                it.gravity = targetGravity
+                it.marginEnd = targetEndMargin
+                it.bottomMargin = targetBottomMargin
+                volumeColumn.layoutParams = it
+            }
+        }
+        val volumeLength = when { shortLandscape -> 150; landscape -> 250; else -> (availableWidth - 176).coerceIn(132, 220) }
+        val labelParams = volumeLabel.layoutParams as LinearLayout.LayoutParams
+        val captionParams = volumeCaption.layoutParams as LinearLayout.LayoutParams
+        val targetLabelWidth = if (landscape) LayoutParams.MATCH_PARENT else LayoutParams.WRAP_CONTENT
+        val targetLabelHeight = if (landscape) dp(22) else LayoutParams.WRAP_CONTENT
+        val targetLabelMargin = if (landscape) 0 else dp(8)
+        val targetCaptionWidth = if (landscape) LayoutParams.MATCH_PARENT else LayoutParams.WRAP_CONTENT
+        val targetCaptionHeight = if (landscape) dp(22) else LayoutParams.WRAP_CONTENT
+        val targetCaptionMargin = if (landscape) 0 else dp(8)
+        val labelChanged = labelParams.width != targetLabelWidth || labelParams.height != targetLabelHeight || labelParams.marginStart != targetLabelMargin
+        val captionChanged = captionParams.width != targetCaptionWidth || captionParams.height != targetCaptionHeight || captionParams.marginEnd != targetCaptionMargin
+        if (landscape) {
+            captionParams.width = targetCaptionWidth; captionParams.height = targetCaptionHeight
+            captionParams.marginEnd = targetCaptionMargin
+            labelParams.width = targetLabelWidth; labelParams.height = targetLabelHeight
+            labelParams.marginStart = targetLabelMargin
+        } else {
+            captionParams.width = targetCaptionWidth; captionParams.height = targetCaptionHeight
+            captionParams.marginEnd = targetCaptionMargin
+            labelParams.width = targetLabelWidth; labelParams.height = targetLabelHeight
+            labelParams.marginStart = targetLabelMargin
+        }
+        if (captionChanged) volumeCaption.layoutParams = captionParams
+        if (labelChanged) volumeLabel.layoutParams = labelParams
+        val trackWidth = if (landscape) dp(58) else dp(volumeLength)
+        val trackHeight = if (landscape) dp(volumeLength) else dp(48)
+        val trackParams = volumeTrack.layoutParams as LinearLayout.LayoutParams
+        if (trackParams.width != trackWidth || trackParams.height != trackHeight) {
+            trackParams.width = trackWidth
+            trackParams.height = trackHeight
+            volumeTrack.layoutParams = trackParams
+        }
+        val targetRotation = if (landscape) -90f else 0f
+        val sliderWidth = if (landscape) dp(volumeLength) else LayoutParams.MATCH_PARENT
+        val sliderParams = volumeSlider.layoutParams as FrameLayout.LayoutParams
+        if (volumeSlider.rotation != targetRotation || sliderParams.width != sliderWidth || sliderParams.height != dp(44)) {
+            volumeSlider.rotation = targetRotation
+            sliderParams.width = sliderWidth
+            sliderParams.height = dp(44)
+            volumeSlider.layoutParams = sliderParams
+        }
+        lastLayoutProfile = layoutProfile
+    }
+
+    private fun setWidgetsTextSizeIfChanged(sizeSp: Float) {
+        val currentSizeSp = widgets.textSize / resources.displayMetrics.scaledDensity
+        if (kotlin.math.abs(currentSizeSp - sizeSp) > 0.5f) {
+            widgets.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+        }
     }
 
     /** Reflects volume changes originating from either iOS or this screen without feeding back. */
@@ -508,7 +687,7 @@ class NowPlayingScreen @JvmOverloads constructor(
                     animateBackdropTo(null)
                     // No artwork from the sender (typical for raw system audio) — show the AirPlay glyph.
                     artwork.scaleType = ImageView.ScaleType.CENTER_INSIDE
-                    val glyph = requireNotNull(context.getDrawable(R.drawable.ic_airplay)).mutate().apply {
+                    val glyph = requireNotNull(androidx.appcompat.content.res.AppCompatResources.getDrawable(context, R.drawable.ic_airplay)).mutate().apply {
                         setTint(color(R.color.text_secondary))
                     }
                     transitionArtwork(glyph)
@@ -521,6 +700,7 @@ class NowPlayingScreen @JvmOverloads constructor(
         }
 
         titleView.text = info.title ?: context.getString(R.string.now_playing_audio)
+        titleView.scrollTo(0, 0)
         artistView.setTextVisible(info.artist)
         albumView.setTextVisible(info.album)
     }

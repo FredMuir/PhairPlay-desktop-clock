@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="text_devices_title" type="id" />
+    <item name="text_devices_subtitle" type="id" />
+    <item name="now_playing_track_title" type="id" />
+    <item name="now_playing_clock" type="id" />
+    <item name="now_playing_volume_column" type="id" />
+    <item name="now_playing_volume_track" type="id" />
+    <item name="now_playing_volume_slider" type="id" />
+</resources>

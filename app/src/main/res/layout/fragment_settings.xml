@@ -21,7 +21,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="32dp">
+        android:paddingHorizontal="@dimen/page_horizontal_padding"
+        android:paddingTop="@dimen/page_top_padding"
+        android:paddingBottom="@dimen/page_bottom_padding">
 
         <!-- Page title -->
         <TextView
@@ -29,9 +31,9 @@
             android:layout_height="wrap_content"
             android:text="@string/nav_settings"
             android:textColor="@color/text_primary"
-            android:textSize="32sp"
+            android:textSize="@dimen/settings_title_size"
             android:fontFamily="sans-serif-light"
-            android:layout_marginBottom="32dp" />
+            android:layout_marginBottom="@dimen/settings_title_bottom_spacing" />
 
         <!-- ── Section: Display ────────────────────────────────── -->
         <include layout="@layout/settings_section_header"
@@ -107,8 +109,12 @@
                 android:textSize="18sp" />
             <TextView
                 android:id="@+id/text_audio_screen_timeout_value"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="0.45"
+                android:gravity="end"
+                android:maxLines="2"
+                android:ellipsize="end"
                 android:textColor="@color/text_secondary"
                 android:textSize="16sp" />
         </LinearLayout>
@@ -120,12 +126,12 @@
         <LinearLayout android:id="@+id/row_widget_style" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp"
             android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="10dp" android:background="@drawable/settings_row_selector" android:focusable="true">
             <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/setting_widget_style" android:textColor="@color/text_primary" android:textSize="18sp" />
-            <TextView android:id="@+id/text_widget_style_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="16sp" />
+            <TextView android:id="@+id/text_widget_style_value" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="0.45" android:gravity="end" android:maxLines="2" android:ellipsize="end" android:textColor="@color/text_secondary" android:textSize="16sp" />
         </LinearLayout>
         <LinearLayout android:id="@+id/row_weather_city" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp"
             android:gravity="center_vertical" android:paddingHorizontal="16dp" android:paddingVertical="10dp" android:background="@drawable/settings_row_selector" android:focusable="true">
             <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/setting_weather_city" android:textColor="@color/text_primary" android:textSize="18sp" />
-            <TextView android:id="@+id/text_weather_city_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_secondary" android:textSize="16sp" />
+            <TextView android:id="@+id/text_weather_city_value" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="0.45" android:gravity="end" android:maxLines="2" android:ellipsize="end" android:textColor="@color/text_secondary" android:textSize="16sp" />
         </LinearLayout>
         <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_keep_on" android:layout_width="match_parent" android:layout_height="wrap_content" />
         <include layout="@layout/settings_toggle_row" android:id="@+id/row_bedside_clock_dim" android:layout_width="match_parent" android:layout_height="wrap_content" />
@@ -302,8 +308,12 @@
 
             <TextView
                 android:id="@+id/text_version_value"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="0.45"
+                android:gravity="end"
+                android:maxLines="2"
+                android:ellipsize="end"
                 android:textColor="@color/text_secondary"
                 android:textSize="16sp" />
         </LinearLayout>

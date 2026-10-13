@@ -30,8 +30,8 @@ android {
         targetSdk = 35
         // Keep versionCode monotonic for Android upgrades; bump versionName with each
         // user-visible device-validation build so installed APKs are easy to identify.
-        versionCode = 45
-        versionName = "1.0.42-tbj607f"
+        versionCode = 64
+        versionName = "1.0.61-tbj607f"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "CAST_APP_ID", "\"${castAppId.escapedForBuildConfig()}\"")

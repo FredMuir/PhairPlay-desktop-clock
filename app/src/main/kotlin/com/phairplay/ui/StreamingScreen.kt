@@ -56,7 +56,8 @@ class StreamingScreen @JvmOverloads constructor(
         setBackgroundColor(Color.parseColor("#A6000000"))
         textSize = 13f
         typeface = Typeface.MONOSPACE
-        setPadding(24, 16, 24, 16)
+        setPadding(dp(12), dp(8), dp(12), dp(8))
+        maxLines = Int.MAX_VALUE
         visibility = GONE
     }
     // Last applied surface size, so we only re-layout on an actual change (rotation/resolution switch).
@@ -93,7 +94,7 @@ class StreamingScreen @JvmOverloads constructor(
         addView(debugView, LayoutParams(
             LayoutParams.WRAP_CONTENT,
             LayoutParams.WRAP_CONTENT
-        ).apply { gravity = Gravity.TOP or Gravity.START; topMargin = 48; leftMargin = 48 })
+        ).apply { gravity = Gravity.TOP or Gravity.START; topMargin = dp(16); marginStart = dp(16) })
 
         // Register a callback to track when the Surface is created/destroyed
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
@@ -156,8 +157,21 @@ class StreamingScreen @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        updateDebugOverlayWidth(width)
         handler.post(tick)                 // drive aspect-fit + debug HUD
     }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        updateDebugOverlayWidth(w)
+    }
+
+    private fun updateDebugOverlayWidth(containerWidth: Int) {
+        if (containerWidth <= 0) return
+        debugView.maxWidth = (containerWidth - dp(48)).coerceAtLeast(dp(120))
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onDetachedFromWindow() {
         handler.removeCallbacks(tick)

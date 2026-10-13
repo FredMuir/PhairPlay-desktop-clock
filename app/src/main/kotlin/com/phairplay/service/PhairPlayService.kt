@@ -162,20 +162,27 @@ class PhairPlayService : Service() {
             Logger.w("No ConnectivityManager — mDNS will not recover automatically from a network drop")
             return
         }
+        // AirPlay discovery and streaming stay on the local Wi-Fi LAN; they do not depend on
+        // Internet validation or a cellular default route. Listening only for Wi-Fi also avoids
+        // tearing down and re-registering mDNS when an unrelated mobile-data network changes.
         val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .build()
+        var activeWifiNetwork: Network? = null
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                if (activeWifiNetwork == network) return
+                activeWifiNetwork = network
                 if (_serviceState.value != ServiceState.Running) return
-                Logger.i("Network available — re-advertising over mDNS")
+                Logger.i("Wi-Fi network available — re-advertising over mDNS")
                 airPlayReceiver?.readvertise()
             }
 
             override fun onLost(network: Network) {
+                if (activeWifiNetwork == network) activeWifiNetwork = null
                 // Nothing to do: the registration is already gone with the interface. Logged
                 // because it is the other half of the story when reading a diagnostic dump.
-                Logger.i("Network lost — mDNS advertisement is gone until it returns")
+                Logger.i("Wi-Fi network lost — mDNS advertisement is gone until it returns")
             }
         }
         runCatching { cm.registerNetworkCallback(request, callback) }
@@ -258,7 +265,7 @@ class PhairPlayService : Service() {
 
     private fun applySystemMediaVolumeDb(volumeDb: Float) {
         val audio = getSystemService(AudioManager::class.java)
-        val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        val min = mediaStreamMinVolume(audio)
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(min + 1)
         val span = max - min
         // AirPlay reserves -144 dB for mute; every other value, including its -30 dB
@@ -277,7 +284,7 @@ class PhairPlayService : Service() {
     /** Refreshes the card value after the user changes media volume with hardware/system controls. */
     fun publishSystemMediaVolume() {
         val audio = getSystemService(AudioManager::class.java)
-        val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        val min = mediaStreamMinVolume(audio)
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(min + 1)
         val index = audio.getStreamVolume(AudioManager.STREAM_MUSIC).coerceIn(min, max)
         val volumeDb = if (index <= min) -144f else {
@@ -296,6 +303,10 @@ class PhairPlayService : Service() {
 
     private fun airPlayFractionToVolume(fraction: Float): Float =
         if (fraction <= 0f) -144f else -30f + fraction.coerceIn(0f, 1f) * 30f
+
+    /** The system minimum stream volume API was added in API 28; before that it is zero. */
+    private fun mediaStreamMinVolume(audio: AudioManager): Int =
+        if (android.os.Build.VERSION.SDK_INT >= 28) audio.getStreamMinVolume(AudioManager.STREAM_MUSIC) else 0
 
     override fun onDestroy() {
         Logger.i("PhairPlayService destroying")

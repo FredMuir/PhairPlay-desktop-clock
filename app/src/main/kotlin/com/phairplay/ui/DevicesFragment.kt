@@ -13,6 +13,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.fragment.app.Fragment
 import com.phairplay.R
 
@@ -34,37 +35,46 @@ class DevicesFragment : Fragment() {
 
     override fun onCreateView(inflater: android.view.LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         nsd = requireContext().getSystemService(Context.NSD_SERVICE) as NsdManager
+        val compactHeight = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val root = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(28), dp(22), dp(28), dp(18))
+            setPadding(dp(if (compactHeight) 20 else 28), dp(if (compactHeight) 10 else 22), dp(if (compactHeight) 20 else 28), dp(if (compactHeight) 10 else 18))
             setBackgroundColor(requireContext().getColor(R.color.background_dark))
         }
         val heading = TextView(requireContext()).apply {
+            id = R.id.text_devices_title
             text = getString(R.string.devices_title)
-            textSize = 28f
+            textSize = if (compactHeight) 22f else 28f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
             setTextColor(requireContext().getColor(R.color.text_primary))
         }
         root.addView(heading)
         root.addView(TextView(requireContext()).apply {
+            id = R.id.text_devices_subtitle
             text = getString(R.string.devices_subtitle)
             textSize = 15f
             setTextColor(requireContext().getColor(R.color.text_secondary))
-            setPadding(0, dp(6), 0, dp(14))
+            setPadding(0, dp(if (compactHeight) 2 else 6), 0, dp(if (compactHeight) 6 else 14))
         })
         root.addView(Button(requireContext()).apply {
             text = getString(R.string.devices_refresh)
             isAllCaps = false
             isFocusable = true
             minWidth = dp(112)
+            minHeight = dp(if (compactHeight) 40 else 46)
             setPadding(dp(20), 0, dp(20), 0)
             setTextColor(requireContext().getColor(R.color.background_dark))
-            background = requireContext().getDrawable(R.drawable.btn_devices_refresh_selector)
+            background = AppCompatResources.getDrawable(requireContext(), R.drawable.btn_devices_refresh_selector)
             setOnClickListener { refreshDiscovery() }
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(46)).apply {
-            bottomMargin = dp(12)
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(if (compactHeight) 6 else 12)
         })
-        val scroll = ScrollView(requireContext())
-        content = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(requireContext()).apply { isFillViewport = true }
+        content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = if (compactHeight) Gravity.TOP else Gravity.CENTER_VERTICAL
+        }
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         showEmpty(getString(R.string.devices_scanning))
@@ -216,17 +226,23 @@ class DevicesFragment : Fragment() {
                 setOnClickListener { showDetails(info, rawModel, ip) }
             }
             card.addView(TextView(requireContext()).apply {
-                text = displayName(info) + if (isFavorite(info)) "  ★" else ""
+                text = if (isFavorite(info)) getString(R.string.devices_favorite_name, displayName(info)) else displayName(info)
                 textSize = 18f
+                maxLines = 2
+                includeFontPadding = true
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(requireContext().getColor(R.color.text_primary))
             })
             card.addView(TextView(requireContext()).apply {
-                text = "$model   ·   $ip:${info.port}"
+                text = getString(R.string.devices_endpoint, model, ip, info.port)
                 textSize = 14f
+                maxLines = 3
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(requireContext().getColor(R.color.text_secondary))
                 setPadding(0, dp(4), 0, 0)
             })
-            content.addView(card, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76)).apply { bottomMargin = dp(8) })
+            card.minimumHeight = dp(76)
+            content.addView(card, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) })
         }
     }
 

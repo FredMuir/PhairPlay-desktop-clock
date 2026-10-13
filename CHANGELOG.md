@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.61-tbj607f] - 2026-10-13
+
+> Device compatibility milestone. This development build is validated on the Lenovo TB-J607F and OnePlus 7 Pro (GM1910); it is not a public release build.
+
+### Changed
+- Add responsive layouts and dimensions for portrait phones, landscape layouts, and sw600dp tablets; keep screen content centered and reserve space for clock seconds and volume controls.
+- Improve receiver UI adaptation and service/network behavior for Android phone and tablet hardware.
+- Increase Android `versionCode` to 64 (`1.0.61-tbj607f`).
+
+### Fixed
+- Prevent the seconds digit from being clipped at the edge of the clock on narrow displays.
+- Improve AirPlay service discovery and foreground receiver stability on the OnePlus 7 Pro.
+
+### Validation
+- Lenovo TB-J607F physical tablet: all 9 `MainActivityTest` instrumented UI tests passed on v64.
+- OnePlus 7 Pro (GM1910), Android 14: all 9 `MainActivityTest` instrumented UI tests passed on v64; the Lenovo device list discovered the OnePlus receiver.
+- API 31 emulator: targeted clock-layout test passed. A full v64 phone-emulator run was interrupted when the AVD disconnected from ADB during test execution.
+- On the OnePlus, the foreground service remained active and AirPlay mDNS registrations remained visible after the screen entered doze.
+- End-to-end AirPlay audio playback was not revalidated as part of this UI/device compatibility milestone.
+
 ## [Unreleased]
 
 ### Fixed

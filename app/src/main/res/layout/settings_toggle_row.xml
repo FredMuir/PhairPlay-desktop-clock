@@ -22,6 +22,8 @@
             android:id="@+id/text_setting_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:maxLines="3"
+            android:ellipsize="end"
             android:textColor="@color/text_primary"
             android:textSize="18sp" />
 
@@ -29,6 +31,8 @@
             android:id="@+id/text_setting_subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:maxLines="4"
+            android:ellipsize="end"
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
             android:visibility="gone" />

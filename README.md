@@ -20,13 +20,13 @@
 
 ## Project Status / 项目状态
 
-**EN:** The latest source on this fork's branch is **1.0.42** (`versionCode` 45). A local **1.0.43** development candidate (`versionCode` 46) is being prepared and is not part of this branch yet. This public repository is an independent development fork, not the original project's release channel; development is not intended to merge back into the original project. Check this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) for packages; source builds may include changes that are not in a release.
+**EN:** The latest development milestone on this fork's `codex/public-release` branch is **1.0.61-tbj607f** (`versionCode` 64). It has passed instrumented UI checks on the Lenovo TB-J607F and OnePlus 7 Pro; see the [device validation record](docs/TESTING.md). This public repository is an independent development fork, not the original project's release channel; development is not intended to merge back into the original project. Check this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) for published packages; this milestone is source only.
 
-**中文：** 当前 fork 分支中的最新源码为 **1.0.42**（`versionCode` 45）。本地正在准备 **1.0.43** 开发候选版（`versionCode` 46），尚未合入此分支。这是独立开发的公开 fork，不是原始项目的发布渠道；开发成果也不计划合并回原始项目。可在本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)查看安装包；源码中的功能可能尚未包含在正式发布包里。
+**中文：** 当前 fork 的 `codex/public-release` 分支最新开发阶段为 **1.0.61-tbj607f**（`versionCode` 64），已在 Lenovo TB-J607F 和 OnePlus 7 Pro 上通过界面仪器测试；详见[设备验证记录](docs/TESTING.md)。这是独立开发的公开 fork，不是原始项目的发布渠道；开发成果也不计划合并回原始项目。可在本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)查看已发布安装包；本阶段目前仅发布源码。
 
-**EN:** The main goal is to support more Android devices without regressing the established tablet and TV experience. Current build variants target Google/Android TV (Android 10+) and Fire TV (Android 7.1+). Phone and tablet adaptation is in progress; a device is not considered supported until it has been validated. Playback, mDNS discovery, screen sizing, remote controls, and audio synchronization can vary by Android version and manufacturer. See [docs/TESTING.md](docs/TESTING.md) for validation scope.
+**EN:** The main goal is to support more Android devices without regressing the established tablet and TV experience. Current build variants target Google/Android TV (Android 10+) and Fire TV (Android 7.1+). Phone and tablet adaptation remains in progress; the Lenovo TB-J607F and OnePlus 7 Pro have passed the UI and discovery checks listed in [docs/TESTING.md](docs/TESTING.md). Playback, mDNS discovery, screen sizing, remote controls, and audio synchronization can vary by Android version and manufacturer.
 
-**中文：** 项目的主要目标是在保持现有平板和电视体验的同时，支持更多 Android 设备。当前构建变体面向 Google/Android TV（Android 10+）和 Fire TV（Android 7.1+）。手机和平板适配仍在进行；设备只有经过验证后才会列为已验证设备。播放、mDNS 发现、界面尺寸、遥控器操作和音频同步可能因 Android 版本及厂商而异。验证范围见 [docs/TESTING.md](docs/TESTING.md)。
+**中文：** 项目的主要目标是在保持现有平板和电视体验的同时，支持更多 Android 设备。当前构建变体面向 Google/Android TV（Android 10+）和 Fire TV（Android 7.1+）。手机和平板适配仍在进行；Lenovo TB-J607F 和 OnePlus 7 Pro 已通过 [docs/TESTING.md](docs/TESTING.md) 列出的界面及设备发现检查。播放、mDNS 发现、界面尺寸、遥控器操作和音频同步可能因 Android 版本及厂商而异。
 
 **EN:** The AirPlay 2 implementation includes mDNS advertising, RTSP/HomeKit pairing, FairPlay key decryption, H.264 mirroring, AAC-ELD/AAC-LC/ALAC audio, PTP timing for multi-room playback, artwork and metadata, and remote-control paths over MediaRemote and DACP. Actual support varies by device and sender.
 

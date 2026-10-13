@@ -6,6 +6,21 @@ Choose checks based on the changed behavior and target device. UI-only changes c
 
 ---
 
+## Device Validation Record
+
+### 2026-10-13 — Phone and tablet compatibility milestone
+
+Build: `versionCode 64`, `versionName 1.0.61-tbj607f` (`googletvDebug`).
+
+| Device / environment | Result |
+|---|---|
+| Lenovo TB-J607F physical tablet | Full `MainActivityTest` instrumented suite: 9/9 passed. |
+| OnePlus 7 Pro (GM1910), Android 14 | Full `MainActivityTest` instrumented suite: 9/9 passed. The Lenovo device list discovered the OnePlus receiver. |
+| API 31 tablet emulator | Targeted clock fit test: 1/1 passed. |
+| API 31 phone emulator | A full v64 run was interrupted when the AVD disconnected from ADB during test execution; the targeted clock test had passed before disconnect. |
+
+The OnePlus foreground receiver service kept advertising `_airplay._tcp` and `_raop._tcp` while the display was in doze. This record covers UI, installation, and discovery checks; it does not establish end-to-end AirPlay audio playback on v64.
+
 ## How to Run Tests
 
 ### Unit Tests (no device required)

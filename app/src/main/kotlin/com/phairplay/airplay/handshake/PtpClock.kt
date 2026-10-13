@@ -1,6 +1,8 @@
 package com.phairplay.airplay.handshake
 
 import android.content.Context
+import android.os.Build
+import android.os.SystemClock
 import com.phairplay.util.Logger
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -94,9 +96,15 @@ class PtpClock(private val context: Context, private val onOffset: (Long) -> Uni
         runCatching { writer?.write("STOP\n"); writer?.flush() }
         // `su -c app_process` may outlive the app if only the su wrapper is destroyed.
         // Let the daemon close its sockets first, then terminate the exact child process.
-        runCatching { process?.waitFor(1200, java.util.concurrent.TimeUnit.MILLISECONDS) }
-        runCatching { process?.destroyForcibly() }
-        runCatching { process?.waitFor(1200, java.util.concurrent.TimeUnit.MILLISECONDS) }
+        process?.let { child ->
+            if (!waitForProcess(child, 1200)) {
+                runCatching { child.destroy() }
+                if (!waitForProcess(child, 1200) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    runCatching { child.destroyForcibly() }
+                    waitForProcess(child, 1200)
+                }
+            }
+        }
         stopOrphanedDaemon()
         process = null
         writer = null
@@ -105,12 +113,27 @@ class PtpClock(private val context: Context, private val onOffset: (Long) -> Uni
     /** Stops only the PID recorded by our helper, after verifying its command line. */
     private fun stopOrphanedDaemon() {
         runCatching {
-            ProcessBuilder("su", "-c", "pid=\$(cat /data/local/tmp/phairplay-ptp.pid 2>/dev/null); " +
+            val child = ProcessBuilder("su", "-c", "pid=\$(cat /data/local/tmp/phairplay-ptp.pid 2>/dev/null); " +
                 "case \"\$pid\" in ''|*[!0-9]*) exit 0;; esac; " +
                 "cmd=\$(tr '\\000' ' ' < /proc/\$pid/cmdline 2>/dev/null); " +
                 "case \"\$cmd\" in *com.phairplay.airplay.handshake.RootPtpDaemon*) kill \$pid;; esac")
-                .redirectErrorStream(true).start().waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+                .redirectErrorStream(true).start()
+            waitForProcess(child, 2000)
         }
+    }
+
+    /** Timed Process.waitFor was added in API 26. Poll exitValue on API 25 to retain its timeout. */
+    private fun waitForProcess(process: Process, timeoutMs: Long): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return runCatching { process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }
+                .getOrDefault(false)
+        }
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (runCatching { process.exitValue(); true }.getOrDefault(false)) return true
+            SystemClock.sleep(25)
+        }
+        return runCatching { process.exitValue(); true }.getOrDefault(false)
     }
 }
 
