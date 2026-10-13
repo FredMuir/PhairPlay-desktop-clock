@@ -85,6 +85,22 @@ android {
         }
     }
 
+    // Keep every local debug APK (Lenovo, OnePlus, and emulators) on one stable
+    // development identity. Configure phairplay.debugKeystore in the user's
+    // ~/.gradle/gradle.properties; never commit the keystore itself.
+    val sharedDebugKeystore = providers.gradleProperty("phairplay.debugKeystore").orNull
+        ?: providers.environmentVariable("PHAIRPLAY_DEBUG_KEYSTORE").orNull
+    if (!sharedDebugKeystore.isNullOrBlank()) {
+        signingConfigs {
+            getByName("debug") {
+                storeFile = file(sharedDebugKeystore)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isDebuggable = true

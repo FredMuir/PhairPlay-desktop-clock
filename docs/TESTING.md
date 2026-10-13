@@ -28,7 +28,7 @@ The OnePlus foreground receiver service kept advertising `_airplay._tcp` and `_r
 - AirPlay 2 buffered audio (type 103) is accepted by the control path but is not yet played back.
 - Google Cast and Miracast media playback remain incomplete; only their control/setup paths are implemented.
 - Manufacturer-specific multicast filtering, battery management, unusual aspect ratios, split-screen, and non-default display/font scaling are not exhaustively validated. Discovery may vary by Wi-Fi access point and Android vendor.
-- The APKs in the v64 prerelease use debug signing certificates. The Lenovo and OnePlus APKs have different signing identities; install the matching variant to update those existing test installations. A signature mismatch prevents in-place installation and may require uninstalling the existing app, which removes its local data.
+- The v64 device-test APKs were originally signed with different debug certificates. The unified prerelease APK uses the Lenovo certificate; updating an existing OnePlus or emulator installation signed with another certificate requires uninstalling it first, which removes its local app data. All later local debug variants are configured to use the shared Lenovo-derived key.
 
 ## How to Run Tests
 
