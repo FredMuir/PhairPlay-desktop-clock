@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.61-tbj607f] - 2026-10-13
 
-> Device compatibility milestone. This development build is validated on the Lenovo TB-J607F and OnePlus 7 Pro (GM1910); it is not a public release build.
+> GitHub prerelease for device testing. It is signed with development keys and is not a production or store release.
 
 ### Changed
 - Add responsive layouts and dimensions for portrait phones, landscape layouts, and sw600dp tablets; keep screen content centered and reserve space for clock seconds and volume controls.

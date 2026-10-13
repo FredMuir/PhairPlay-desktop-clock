@@ -21,6 +21,15 @@ Build: `versionCode 64`, `versionName 1.0.61-tbj607f` (`googletvDebug`).
 
 The OnePlus foreground receiver service kept advertising `_airplay._tcp` and `_raop._tcp` while the display was in doze. This record covers UI, installation, and discovery checks; it does not establish end-to-end AirPlay audio playback on v64.
 
+### Release scope and open issues
+
+- The API 31 phone emulator's full v64 run lost its ADB connection during test 7. The targeted clock test passed before the disconnect; this is an incomplete run, not a pass for the full suite.
+- AirPlay sender-to-receiver media playback, mirroring, codec interoperability, and multi-room synchronization were not revalidated on v64. Discovery and UI results must not be treated as playback acceptance.
+- AirPlay 2 buffered audio (type 103) is accepted by the control path but is not yet played back.
+- Google Cast and Miracast media playback remain incomplete; only their control/setup paths are implemented.
+- Manufacturer-specific multicast filtering, battery management, unusual aspect ratios, split-screen, and non-default display/font scaling are not exhaustively validated. Discovery may vary by Wi-Fi access point and Android vendor.
+- The APKs in the v64 prerelease use debug signing certificates. The Lenovo and OnePlus APKs have different signing identities; install the matching variant to update those existing test installations. A signature mismatch prevents in-place installation and may require uninstalling the existing app, which removes its local data.
+
 ## How to Run Tests
 
 ### Unit Tests (no device required)
