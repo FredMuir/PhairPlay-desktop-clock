@@ -303,3 +303,33 @@ Target values:
 | No CI hardware for video tests | MediaCodec tests can't run in CI | Manual testing required before release |
 | FairPlay content can't be tested | Protected content (Netflix, etc.) is blocked by Apple — expected behavior | Document as known limitation in README |
 | Wi-Fi quality varies | Latency tests may fail on congested 2.4 GHz | Test on 5 GHz or Ethernet |
+
+## 中文测试操作对照
+
+本节对应上方英文自动化和手动测试说明。测试结果应记录在[设备验证记录](#device-validation-record--设备验证记录)和版本记录中；以下手动场景是发布验收流程，不代表本次预发布版已经全部通过。
+
+### 自动化检查
+
+- **单元测试：** `./gradlew test` 运行两种产品风味的单元测试；也可运行 `./gradlew testGoogletvDebugUnitTest` 或 `./gradlew testFiretvDebugUnitTest`，或用 `--tests` 指定测试类。报告位于 `app/build/reports/tests/`。CI 协议/单元测试以 `:test-runner:test` 为准；部分依赖 Android 框架的测试在主机 JVM 上不稳定。
+- **仪器测试：** 连接实体 Android 设备或启动模拟器，然后运行 `adb devices` 确认连接，再运行 `./gradlew connectedAndroidTest`。这类测试覆盖界面及系统集成。
+- **Lint 和 CI 构建：** `./gradlew lint` 执行 Android Lint。完整本地 CI 检查命令见上方英文步骤；它会运行协议测试、两个风味的 Lint 和调试 APK 构建。
+
+### 手动测试前准备
+
+每台设备开始测试前保存干净基线：运行 `adb devices -l` 检查设备，并用 `adb logcat -c` 清空旧日志。分别为 Google TV/Android TV 与 Fire TV 构建并安装对应调试 APK。若需要真实 Google Cast 测试，先在 Google Cast SDK Developer Console 注册接收器并配置 Cast App ID；详情见 [Google Cast App ID 指南](guides/CAST_APP_ID.md)。失败后先运行 `tools/collect-device-logs.sh` 收集设备、包信息、内存、CPU 和筛选后的 logcat，再重启应用。若两个产品风味都已安装，可设置 `PHAIRPLAY_PACKAGE` 指定收集哪个包。
+
+### 发布前手动验收场景
+
+下列场景是通用验收流程；发布前应在 Google TV/Android TV 和 Fire TV 上执行。本次 v64 发布记录中未声称这些场景全部通过。
+
+1. **应用启动：** 安装并从电视应用列表启动 PhairPlay；确认 WaitingScreen 显示设备名称、无崩溃对话框或 FATAL 日志，并稳定运行 30 秒。
+2. **mDNS 发现：** Mac 与电视接入同一 Wi-Fi，启动应用后检查 AirPlay 菜单；目标设备应在 3 秒内出现。退出应用后应在 10 秒内消失。
+3. **屏幕镜像连接：** 从 Mac 选择电视；预期电视切换到 StreamingScreen。日志应记录 OPTIONS → ANNOUNCE → SETUP → SETUP → RECORD 且全部返回 `200 OK`，不得出现 RTSP `4xx`/`5xx`。停止镜像后，电视应在 2 秒内回到 WaitingScreen。
+4. **视频质量：** 镜像毫秒计时画面 5 分钟；预期帧率至少 25 fps、延迟不超过 100 ms，且无黑屏闪烁或画面冻结。也可查看 macOS 的屏幕共享质量诊断。
+5. **音画同步：** 播放拍板音画同步测试视频；拍板画面闭合时声音应同步，偏差不应超过约 40 ms。
+6. **稳定性：** 连续串流 30 分钟；预期无断开或崩溃、没有 FATAL 或重连日志，电视仍显示串流界面，内存低于 150 MB。
+7. **断线重连：** 分别测试发送端关闭镜像，以及 Mac 暂时断开再恢复 Wi-Fi/以太网。发送端关闭后电视应在 2 秒内回到 WaitingScreen，5 秒后重新连接无需重启应用；网络恢复后设备应在 5 秒内重新出现在 AirPlay 菜单。
+
+### 性能目标与限制
+
+串流时记录内存和 CPU（英文步骤提供 ADB 命令），目标为峰值内存不超过 150 MB、平均 CPU 不超过 30%、帧率至少 25 fps、延迟不超过 100 ms。CI 没有视频硬件，无法运行 MediaCodec 实测；FairPlay 保护内容无法用于播放验证，这是预期限制；拥挤的 2.4 GHz Wi-Fi 可能导致延迟测试失败，建议改用 5 GHz Wi-Fi 或以太网。
