@@ -75,17 +75,14 @@ Use the **Downloader** app (available in the Fire TV app store) to download the 
 git clone https://github.com/mazer666/PhairPlay.git
 cd PhairPlay
 
-# Build for Google TV
-./gradlew assembleGoogletvRelease
+# Build the single universal Android release package
+./gradlew :app:assembleRelease
 
-# Build for Google TV with a registered Cast App ID
-./gradlew assembleGoogletvRelease -Pphairplay.castAppId=<APP_ID>
-
-# Build for Fire TV
-./gradlew assembleFiretvRelease
+# With a registered Cast App ID
+./gradlew :app:assembleRelease -Pphairplay.castAppId=<APP_ID>
 ```
 
-APKs are in `app/build/outputs/apk/`.
+The universal APK is `app/build/outputs/apk/release/app-release.apk`. All debug and release builds use the workspace signing key; see [the shared policy](../../ANDROID_SIGNING_POLICY_ZH.md) before installing or publishing.
 
 Google Cast requires a registered Cast App ID for real testing. See
 [Google Cast App ID](CAST_APP_ID.md) before testing Cast on Google TV.

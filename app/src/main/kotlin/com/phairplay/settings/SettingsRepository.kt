@@ -112,6 +112,8 @@ class SettingsRepository(private val context: Context) {
         miracastEnabled    = this[Keys.MIRACAST_ENABLED]        ?: true,
         castEnabled        = this[Keys.CAST_ENABLED]            ?: true,
         airPlayPinAuthEnabled = this[Keys.AIRPLAY_PIN_AUTH]     ?: false,
+        legacyDacpControlEnabled = this[Keys.LEGACY_DACP_CONTROL] ?: false,
+        airPlayRemoteControlsEnabled = this[Keys.AIRPLAY_REMOTE_CONTROLS] ?: false,
         startOnBoot        = this[Keys.START_ON_BOOT]           ?: false,
         showDebugOverlay   = this[Keys.SHOW_DEBUG_OVERLAY]      ?: false,
         forceHighResolution = this[Keys.FORCE_HIGH_RESOLUTION]  ?: false,
@@ -128,7 +130,19 @@ class SettingsRepository(private val context: Context) {
         weatherCity = this[Keys.WEATHER_CITY] ?: "",
         bedsideClockKeepScreenOn = this[Keys.CLOCK_KEEP_ON] ?: true,
         bedsideClockDimScreen = this[Keys.CLOCK_DIM_SCREEN] ?: true,
-        bedsideClockShowSeconds = this[Keys.CLOCK_SHOW_SECONDS] ?: false
+        bedsideClockShowSeconds = this[Keys.CLOCK_SHOW_SECONDS] ?: false,
+        clockBatteryEnabled = this[Keys.CLOCK_BATTERY] ?: false,
+        clockNextAlarmEnabled = this[Keys.CLOCK_NEXT_ALARM] ?: false,
+        homeAssistantUrl = this[Keys.HA_URL] ?: "",
+        homeAssistantEntities = this[Keys.HA_ENTITIES] ?: "",
+        homeAssistantCalendars = this[Keys.HA_CALENDARS] ?: "",
+        homeAssistantTodos = this[Keys.HA_TODOS] ?: "",
+        homeAssistantEnabled = this[Keys.HA_ENABLED] ?: false,
+        homeAssistantCalendarEnabled = this[Keys.HA_CALENDAR_ENABLED] ?: false,
+        homeAssistantTodoEnabled = this[Keys.HA_TODO_ENABLED] ?: false,
+        iCloudEmail = this[Keys.ICLOUD_EMAIL] ?: "",
+        iCloudCalendarHrefs = this[Keys.ICLOUD_CALENDARS] ?: "",
+        iCloudCalendarEnabled = this[Keys.ICLOUD_ENABLED] ?: false
     )
 
     /**
@@ -142,6 +156,8 @@ class SettingsRepository(private val context: Context) {
         this[Keys.MIRACAST_ENABLED]     = settings.miracastEnabled
         this[Keys.CAST_ENABLED]         = settings.castEnabled
         this[Keys.AIRPLAY_PIN_AUTH]     = settings.airPlayPinAuthEnabled
+        this[Keys.LEGACY_DACP_CONTROL] = settings.legacyDacpControlEnabled
+        this[Keys.AIRPLAY_REMOTE_CONTROLS] = settings.airPlayRemoteControlsEnabled
         this[Keys.START_ON_BOOT]        = settings.startOnBoot
         this[Keys.SHOW_DEBUG_OVERLAY]   = settings.showDebugOverlay
         this[Keys.FORCE_HIGH_RESOLUTION] = settings.forceHighResolution
@@ -158,6 +174,18 @@ class SettingsRepository(private val context: Context) {
         this[Keys.CLOCK_KEEP_ON] = settings.bedsideClockKeepScreenOn
         this[Keys.CLOCK_DIM_SCREEN] = settings.bedsideClockDimScreen
         this[Keys.CLOCK_SHOW_SECONDS] = settings.bedsideClockShowSeconds
+        this[Keys.CLOCK_BATTERY] = settings.clockBatteryEnabled
+        this[Keys.CLOCK_NEXT_ALARM] = settings.clockNextAlarmEnabled
+        this[Keys.HA_URL] = settings.homeAssistantUrl
+        this[Keys.HA_ENTITIES] = settings.homeAssistantEntities
+        this[Keys.HA_CALENDARS] = settings.homeAssistantCalendars
+        this[Keys.HA_TODOS] = settings.homeAssistantTodos
+        this[Keys.HA_ENABLED] = settings.homeAssistantEnabled
+        this[Keys.HA_CALENDAR_ENABLED] = settings.homeAssistantCalendarEnabled
+        this[Keys.HA_TODO_ENABLED] = settings.homeAssistantTodoEnabled
+        this[Keys.ICLOUD_EMAIL] = settings.iCloudEmail
+        this[Keys.ICLOUD_CALENDARS] = settings.iCloudCalendarHrefs
+        this[Keys.ICLOUD_ENABLED] = settings.iCloudCalendarEnabled
     }
 
     /**
@@ -173,6 +201,8 @@ class SettingsRepository(private val context: Context) {
         val MIRACAST_ENABLED    = booleanPreferencesKey("miracast_enabled")
         val CAST_ENABLED        = booleanPreferencesKey("cast_enabled")
         val AIRPLAY_PIN_AUTH    = booleanPreferencesKey("airplay_pin_auth")
+        val LEGACY_DACP_CONTROL = booleanPreferencesKey("legacy_dacp_control_enabled")
+        val AIRPLAY_REMOTE_CONTROLS = booleanPreferencesKey("airplay_remote_controls_enabled")
         val START_ON_BOOT       = booleanPreferencesKey("start_on_boot")
         val SHOW_DEBUG_OVERLAY  = booleanPreferencesKey("show_debug_overlay")
         val FORCE_HIGH_RESOLUTION = booleanPreferencesKey("force_high_resolution")
@@ -189,5 +219,17 @@ class SettingsRepository(private val context: Context) {
         val CLOCK_KEEP_ON = booleanPreferencesKey("bedside_clock_keep_screen_on")
         val CLOCK_DIM_SCREEN = booleanPreferencesKey("bedside_clock_dim_screen")
         val CLOCK_SHOW_SECONDS = booleanPreferencesKey("bedside_clock_show_seconds")
+        val CLOCK_BATTERY = booleanPreferencesKey("clock_battery_enabled")
+        val CLOCK_NEXT_ALARM = booleanPreferencesKey("clock_next_alarm_enabled")
+        val HA_URL = stringPreferencesKey("ha_url")
+        val HA_ENTITIES = stringPreferencesKey("ha_entities")
+        val HA_CALENDARS = stringPreferencesKey("ha_calendars")
+        val HA_TODOS = stringPreferencesKey("ha_todos")
+        val HA_ENABLED = booleanPreferencesKey("ha_enabled")
+        val HA_CALENDAR_ENABLED = booleanPreferencesKey("ha_calendar_enabled")
+        val HA_TODO_ENABLED = booleanPreferencesKey("ha_todo_enabled")
+        val ICLOUD_EMAIL = stringPreferencesKey("icloud_email")
+        val ICLOUD_CALENDARS = stringPreferencesKey("icloud_calendars")
+        val ICLOUD_ENABLED = booleanPreferencesKey("icloud_calendar_enabled")
     }
 }

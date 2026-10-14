@@ -1,23 +1,22 @@
 #!/usr/bin/env bash
 # PhairPlay local release script
 #
-# Builds signed release APKs for GoogleTV and FireTV locally, then publishes
-# a GitHub Release with both APKs attached.
+# Builds signed release APKs using the workspace-wide Android signing identity,
+# then publishes a GitHub Release with the universal APK attached.
 #
 # Usage:
 #   ./scripts/release.sh v1.2.0
 #
-# First-time setup — run once to create your release keystore:
+# Check that the existing shared keystore is present (no credentials are saved):
 #   ./scripts/release.sh --setup
 #
-# Credentials are stored in ~/.config/phairplay/release.env (outside the repo).
+# Signing credentials are requested for each release and kept only in this process.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CREDS_FILE="${HOME}/.config/phairplay/release.env"
-KEYSTORE_FILE="${HOME}/.config/phairplay/phairplay-release.jks"
+KEYSTORE_FILE="${ANDROID_SHARED_KEYSTORE:-${REPO_ROOT}/../.codex-android-signing/android-unified.keystore}"
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,47 +32,14 @@ require_cmd() {
 # ── first-time keystore setup ────────────────────────────────────────────────
 
 cmd_setup() {
-    bold "=== PhairPlay release keystore setup ==="
+    bold "=== Shared Android signing identity ==="
+    [[ -f "$KEYSTORE_FILE" ]] || die "Shared keystore not found at $KEYSTORE_FILE. Do not create a replacement key."
+    echo "Using the existing workspace-wide keystore at $KEYSTORE_FILE"
+    echo "No key will be generated or overwritten."
     echo ""
 
-    if [[ -f "$KEYSTORE_FILE" ]]; then
-        echo "Keystore already exists at $KEYSTORE_FILE"
-        read -rp "Overwrite? [y/N] " overwrite
-        [[ "$overwrite" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
-    fi
-
-    mkdir -p "$(dirname "$KEYSTORE_FILE")"
-
-    echo "You will be asked a few questions to create your signing key."
-    echo "Remember the passwords — they will be saved to $CREDS_FILE"
-    echo ""
-
-    read -rp "Key alias (e.g. phairplay): " KEY_ALIAS
-    read -rsp "Keystore password: " KEYSTORE_PASSWORD; echo
-    read -rsp "Key password (Enter = same as keystore): " KEY_PASSWORD; echo
-    [[ -z "$KEY_PASSWORD" ]] && KEY_PASSWORD="$KEYSTORE_PASSWORD"
-
-    keytool -genkey -v \
-        -keystore "$KEYSTORE_FILE" \
-        -alias "$KEY_ALIAS" \
-        -keyalg RSA -keysize 2048 -validity 10000 \
-        -storepass "$KEYSTORE_PASSWORD" \
-        -keypass "$KEY_PASSWORD" \
-        -dname "CN=PhairPlay, O=PhairPlay, C=DE"
-
-    mkdir -p "$(dirname "$CREDS_FILE")"
-    chmod 700 "$(dirname "$CREDS_FILE")"
-    cat > "$CREDS_FILE" <<EOF
-KEYSTORE_PATH=${KEYSTORE_FILE}
-KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}
-KEY_ALIAS=${KEY_ALIAS}
-KEY_PASSWORD=${KEY_PASSWORD}
-EOF
-    chmod 600 "$CREDS_FILE"
-
-    green "Done! Credentials saved to $CREDS_FILE"
-    echo ""
-    echo "Run ./scripts/release.sh v1.0.0 to build and publish your first release."
+    green "Shared keystore is present. No key or password was created or saved."
+    echo "Run ./scripts/release.sh vX.Y.Z; it will request the credentials for that release."
 }
 
 # ── main release flow ─────────────────────────────────────────────────────────
@@ -89,10 +55,17 @@ cmd_release() {
     require_cmd keytool
     require_cmd git
 
-    # Load signing credentials and export them so Gradle picks them up
-    [[ -f "$CREDS_FILE" ]] || die "No credentials found. Run: ./scripts/release.sh --setup"
-    set -a; source "$CREDS_FILE"; set +a
-    [[ -f "${KEYSTORE_PATH:-}" ]] || die "Keystore not found at $KEYSTORE_PATH"
+    [[ -f "$KEYSTORE_FILE" ]] || die "Keystore not found at $KEYSTORE_FILE"
+    read -rp "Key alias [androiddebugkey]: " KEY_ALIAS
+    KEY_ALIAS="${KEY_ALIAS:-androiddebugkey}"
+    read -rsp "Keystore password: " KEYSTORE_PASSWORD; echo
+    [[ -n "$KEYSTORE_PASSWORD" ]] || die "Keystore password is required."
+    read -rsp "Key password [same as keystore]: " KEY_PASSWORD; echo
+    KEY_PASSWORD="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+    export ANDROID_SHARED_KEYSTORE="$KEYSTORE_FILE"
+    export ANDROID_SHARED_KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD"
+    export ANDROID_SHARED_KEY_ALIAS="$KEY_ALIAS"
+    export ANDROID_SHARED_KEY_PASSWORD="$KEY_PASSWORD"
 
     # Auto-detect Android SDK if ANDROID_HOME is not set
     if [[ -z "${ANDROID_HOME:-}" ]]; then
@@ -129,36 +102,21 @@ cmd_release() {
     bold "=== Building PhairPlay $VERSION ==="
     echo ""
 
-    # Build both flavors
-    echo "▸ Building GoogleTV release APK..."
-    KEYSTORE_PATH="$KEYSTORE_PATH" \
-    KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
-    KEY_ALIAS="$KEY_ALIAS" \
-    KEY_PASSWORD="$KEY_PASSWORD" \
-    ./gradlew :app:assembleGoogletvRelease --quiet --stacktrace
+    # Build the one universal Android package with the shared signing identity.
+    echo "▸ Building universal release APK..."
+    ANDROID_SHARED_KEYSTORE="$KEYSTORE_FILE" \
+    ANDROID_SHARED_KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
+    ANDROID_SHARED_KEY_ALIAS="$KEY_ALIAS" \
+    ANDROID_SHARED_KEY_PASSWORD="$KEY_PASSWORD" \
+    ./gradlew :app:assembleRelease --quiet --stacktrace
 
-    echo "▸ Building FireTV release APK..."
-    KEYSTORE_PATH="$KEYSTORE_PATH" \
-    KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
-    KEY_ALIAS="$KEY_ALIAS" \
-    KEY_PASSWORD="$KEY_PASSWORD" \
-    ./gradlew :app:assembleFiretvRelease --quiet --stacktrace
+    APK_SRC="app/build/outputs/apk/release/app-release.apk"
+    RELEASE_APK="PhairPlay-${VERSION}.apk"
+    [[ -f "$APK_SRC" ]] || die "Universal APK not found at $APK_SRC"
+    cp "$APK_SRC" "$RELEASE_APK"
 
-    # Locate and rename APKs
-    GOOGLETV_SRC="app/build/outputs/apk/googletv/release/app-googletv-release.apk"
-    FIRETV_SRC="app/build/outputs/apk/firetv/release/app-firetv-release.apk"
-    GOOGLETV_APK="PhairPlay-${VERSION}-googletv.apk"
-    FIRETV_APK="PhairPlay-${VERSION}-firetv.apk"
-
-    [[ -f "$GOOGLETV_SRC" ]] || die "GoogleTV APK not found at $GOOGLETV_SRC"
-    [[ -f "$FIRETV_SRC"   ]] || die "FireTV APK not found at $FIRETV_SRC"
-
-    cp "$GOOGLETV_SRC" "$GOOGLETV_APK"
-    cp "$FIRETV_SRC"   "$FIRETV_APK"
-
-    green "▸ APKs built:"
-    echo "    $GOOGLETV_APK ($(du -sh "$GOOGLETV_APK" | cut -f1))"
-    echo "    $FIRETV_APK   ($(du -sh "$FIRETV_APK"   | cut -f1))"
+    green "▸ Universal APK built:"
+    echo "    $RELEASE_APK ($(du -sh "$RELEASE_APK" | cut -f1))"
     echo ""
 
     # Create and push git tag
@@ -186,9 +144,8 @@ ${COMMITS}
 
 ---
 ### Installation
-Side-load the APK that matches your device:
-- **${GOOGLETV_APK}** — Google TV / Android TV (Android 10+)
-- **${FIRETV_APK}** — Amazon Fire TV (Android 7.1+)
+Side-load the universal APK on a compatible Android phone, tablet, Google TV, or Fire TV:
+- **${RELEASE_APK}** — one package for all supported Android devices
 
 Use [adb](https://developer.android.com/tools/adb) or a sideloading app like *Downloader* to install."
 
@@ -201,11 +158,10 @@ Use [adb](https://developer.android.com/tools/adb) or a sideloading app like *Do
         --title "PhairPlay $VERSION" \
         --notes "$RELEASE_NOTES" \
         $PRERELEASE_FLAG \
-        "$GOOGLETV_APK" \
-        "$FIRETV_APK"
+        "$RELEASE_APK"
 
     # Clean up local APK copies
-    rm -f "$GOOGLETV_APK" "$FIRETV_APK"
+    rm -f "$RELEASE_APK"
 
     echo ""
     green "=== Release $VERSION published! ==="
@@ -223,7 +179,7 @@ case "${1:-}" in
         ;;
     *)
         echo "Usage:"
-        echo "  ./scripts/release.sh --setup       # first-time keystore + credentials setup"
+        echo "  ./scripts/release.sh --setup       # verify the shared signing key is present"
         echo "  ./scripts/release.sh v1.2.0        # build APKs and publish GitHub Release"
         exit 1
         ;;

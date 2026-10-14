@@ -9,15 +9,21 @@
 <resources>
 
     <!-- ── App-wide ────────────────────────────────────────────── -->
-    <string name="app_name">声域 · AirPlay 音响</string>
+    <string name="app_name">声域</string>
 
     <!-- ── Navigation ──────────────────────────────────────────── -->
     <string name="nav_home">音响</string>
     <string name="nav_settings">设置</string>
     <string name="nav_devices">局域网设备</string>
+    <string name="nav_home_compact">音响</string>
+    <string name="nav_settings_compact">设置</string>
+    <string name="nav_devices_compact">设备</string>
+    <string name="nav_now_playing_compact">时钟</string>
     <string name="devices_title">局域网 AirPlay 设备</string>
     <string name="devices_subtitle">自动发现当前网络中的 AirPlay 接收端。点按可查看或复制设备信息；播放分组请在 iPhone、iPad 或 Mac 的 AirPlay 输出菜单中管理。</string>
     <string name="devices_refresh">刷新设备</string>
+    <string name="devices_favorite_name">%1$s  ★</string>
+    <string name="devices_endpoint">%1$s   ·   %2$s:%3$d</string>
     <string name="devices_scanning">正在搜索局域网设备…</string>
     <string name="devices_none">暂未发现设备。请确认设备与本机接入同一局域网，然后刷新。</string>
     <string name="devices_unknown_model">型号未知</string>
@@ -31,31 +37,31 @@
     <string name="devices_detail">型号：%1$s\n地址：%2$s\n端口：%3$d\n能力字段：%4$s</string>
 
     <!-- ── HomeFragment ────────────────────────────────────────── -->
-    <string name="home_title">把平板加入你的声音空间</string>
+    <string name="home_title">将本设备用作 AirPlay 接收端</string>
     <!-- %1$s = device name shown in sender pickers -->
     <string name="home_device_visible_as">AirPlay 中显示为：%1$s</string>
-    <string name="speaker_section_title">本机音响</string>
-    <string name="speaker_room_hint">在 iPhone、iPad 或 Mac 的 AirPlay 输出列表中选择本机。播放时可同时勾选其他 AirPlay 音响，组成多房间播放。</string>
-    <string name="speaker_howto_title">如何开始播放</string>
-    <string name="speaker_howto_body">确认本机和 Apple 设备连在同一个 Wi‑Fi 网络。打开 Apple 设备的 AirPlay 音频输出，选择上方显示的本机名称；若要多房间播放，再勾选其他音响。</string>
+    <string name="speaker_section_title">AirPlay 接收状态</string>
+    <string name="speaker_room_hint">多房间播放由发送设备管理；播放时可在 Apple 设备的 AirPlay 列表中选择其他音响。</string>
+    <string name="speaker_howto_title">如何连接 AirPlay</string>
+    <string name="speaker_howto_body">确保本机与 Apple 设备连接到同一 Wi‑Fi。打开 Apple 设备的 AirPlay 音频输出，选择本机名称即可开始播放。</string>
 
     <!-- ── Protocol names ──────────────────────────────────────── -->
     <string name="protocol_airplay">AirPlay</string>
-    <string name="protocol_miracast">Miracast</string>
-    <string name="protocol_cast">Cast</string>
+    <string name="protocol_miracast">Miracast（实验）</string>
+    <string name="protocol_cast">Google Cast（实验）</string>
 
     <!-- ── Protocol states (shown in status cards) ─────────────── -->
     <string name="protocol_state_disabled">已关闭</string>
     <string name="protocol_state_advertising">正在等待连接</string>
-    <string name="protocol_state_connected">正在播放</string>
+    <string name="protocol_state_connected">已连接</string>
     <string name="protocol_state_error">连接异常</string>
 
     <!-- ── Protocol card detail lines ──────────────────────────── -->
-    <string name="protocol_detail_disabled">请在设置中开启 AirPlay</string>
-    <string name="protocol_detail_waiting">已在局域网广播，等待播放</string>
+    <string name="protocol_detail_disabled">可在设置中启用此接收方式</string>
+    <string name="protocol_detail_waiting">接收端已启动，等待发送设备连接</string>
     <!-- %1$s = sender display name -->
-    <string name="protocol_detail_connected">正在接收来自 %1$s 的音频</string>
-    <string name="protocol_detail_error">检查 Wi‑Fi 与组播设置</string>
+    <string name="protocol_detail_connected">已与 %1$s 建立连接</string>
+    <string name="protocol_detail_error">检查网络连接和设备兼容性</string>
 
     <!-- ── Service states (header badge) ───────────────────────── -->
     <string name="service_state_running">服务运行中</string>
@@ -68,9 +74,9 @@
     <string name="section_controls">服务控制</string>
 
     <!-- ── Control buttons ─────────────────────────────────────── -->
-    <string name="action_start">开启音响</string>
+    <string name="action_start">启动服务</string>
     <string name="action_stop">停止接收</string>
-    <string name="action_restart">重新连接</string>
+    <string name="action_restart">重启服务</string>
 
     <!-- ── Notification ────────────────────────────────────────── -->
     <string name="notification_channel_name">PhairPlay Service</string>
@@ -97,10 +103,10 @@
     <string name="setting_display_name_collision_note">当前广播名称：%1$s</string>
     <string name="setting_airplay_enabled">AirPlay 音频接收</string>
     <string name="setting_airplay_subtitle">接收 Apple 设备发送的音频</string>
-    <string name="setting_miracast_enabled">Miracast 接收</string>
-    <string name="setting_miracast_subtitle">接收 Windows 和 Android 设备的投屏</string>
-    <string name="setting_cast_enabled">Google Cast 接收</string>
-    <string name="setting_cast_subtitle">接收 Chrome 和 Android 设备的投屏</string>
+    <string name="setting_miracast_enabled">Miracast 接收（实验）</string>
+    <string name="setting_miracast_subtitle">发现和连接流程仍在开发，媒体播放尚未完成；部分设备可能不支持接收。</string>
+    <string name="setting_cast_enabled">Google Cast 接收（实验）</string>
+    <string name="setting_cast_subtitle">媒体播放仍在开发；完整测试需要 Google Play 服务和已配置的 Cast 应用 ID。</string>
     <string name="setting_mirror_audio">镜像音频</string>
     <string name="setting_mirror_audio_subtitle">镜像画面时同时播放 Mac 的声音</string>
     <string name="setting_device_mode">AirPlay 设备类型</string>
@@ -115,28 +121,48 @@
     <string name="device_mode_restart_note">设备类型已切换，正在重启 AirPlay 服务。</string>
     <string name="setting_pin_auth">连接时需要配对 PIN</string>
     <string name="setting_pin_auth_subtitle">连接前要求在发送设备上输入本机显示的验证码</string>
+    <string name="setting_airplay_remote_controls">AirPlay 播放控制按钮</string>
+    <string name="setting_airplay_remote_controls_subtitle">默认关闭。开启后显示上一首、播放/暂停和下一首；不影响连接与音频播放</string>
+    <string name="setting_legacy_dacp_control">旧式 DACP 回退（实验）</string>
+    <string name="setting_legacy_dacp_control_subtitle">默认关闭。需同时启用上方控制按钮，仅用于支持 DACP 的发送设备</string>
     <string name="setting_start_on_boot">开机后自动开启</string>
+    <string name="setting_start_on_boot_subtitle">设备启动后自动启动接收服务</string>
     <string name="setting_debug_overlay">调试信息</string>
     <string name="setting_debug_overlay_subtitle">播放时显示帧率、队列和丢包状态</string>
     <string name="setting_force_high_res">高分辨率（1440p）</string>
     <string name="setting_force_high_res_subtitle">画面更清晰但占用更多处理器；关闭时为 1080p</string>
-    <string name="setting_version">版本</string>
+    <string name="setting_version">当前版本</string>
+    <string name="setting_version_value">%1$s（构建号 %2$d）</string>
+    <string name="setting_version_details">GitHub · 查看版本更新与项目说明</string>
+    <string name="setting_version_link_unavailable">无法打开 GitHub 链接</string>
     <string name="setting_reset_defaults">恢复默认设置</string>
     <string name="setting_reset_defaults_message">这会恢复所有设置，包括设备模式、音量界面和床头时钟选项。此操作无法撤销。</string>
     <string name="setting_reset_confirm">恢复默认</string>
 
     <!-- ── Waiting screen (legacy, used by WaitingScreen view) ─── -->
-    <string name="waiting_title">AirPlay 音响已就绪</string>
+    <string name="waiting_title">AirPlay 接收已就绪</string>
     <string name="waiting_subtitle">在 Apple 设备上选择本机开始播放</string>
     <string name="waiting_device_label">本机名称：</string>
     <string name="streaming_hint">按返回键停止播放</string>
 
     <!-- ── Now playing (audio-only screen) ─────────────────────── -->
     <string name="now_playing_audio">正在播放</string>
+    <string name="now_playing_info_time">时间</string>
+    <string name="now_playing_info_schedule">日程</string>
+    <string name="now_playing_info_weather">天气</string>
+    <string name="now_playing_info_devices">设备</string>
+    <string name="now_playing_info_page_accessibility">%1$s，第 %2$d 页，共 %3$d 页</string>
+    <string name="now_playing_return_short">返回应用</string>
+    <string name="now_playing_ha_loading">Home Assistant · 正在更新</string>
+    <string name="now_playing_icloud_loading">iCloud 日历 · 正在更新</string>
     <string name="now_playing_volume_caption">音量</string>
     <string name="now_playing_volume_value">%1$d%%</string>
     <string name="now_playing_volume_accessibility">播放音量</string>
     <string name="now_playing_return">返回应用</string>
+    <string name="now_playing_previous">上一首</string>
+    <string name="now_playing_play">播放</string>
+    <string name="now_playing_pause">暂停</string>
+    <string name="now_playing_next">下一首</string>
     <string name="nav_now_playing">时钟/播放</string>
     <string name="setting_audio_screen_off">播放时允许熄屏</string>
     <string name="setting_audio_screen_off_subtitle">播放期间按所选空闲时长关闭屏幕，声音继续播放</string>
@@ -144,7 +170,9 @@
     <string name="setting_audio_screen_timeout_value">%1$d 分钟</string>
     <string name="setting_audio_screen_timeout_dialog">选择播放时空闲多久后允许熄屏</string>
     <string name="setting_widget_clock">播放卡片数字时钟</string>
+    <string name="setting_widget_clock_subtitle">在正在播放页面显示当前时间</string>
     <string name="setting_widget_date">播放卡片日期</string>
+    <string name="setting_widget_date_subtitle">在时间旁显示本地日期</string>
     <string name="setting_widget_agenda">播放卡片今日安排</string>
     <string name="setting_widget_agenda_subtitle">启用后读取系统日历中的今日活动</string>
     <string name="setting_widget_agenda_permission_denied">未获得日历权限，今日安排不会显示</string>
@@ -152,6 +180,7 @@
     <string name="setting_widget_agenda_unavailable">日历暂不可用</string>
     <string name="setting_widget_agenda_permission_needed">启用今日安排需要允许读取系统日历</string>
     <string name="setting_widget_weather">播放卡片天气</string>
+    <string name="setting_widget_weather_subtitle">需要互联网连接；在下方设置城市</string>
     <string name="now_playing_weather_city_missing">天气 · 请在设置中填写城市</string>
     <string name="now_playing_weather_loading">天气 · %1$s · 更新中</string>
     <string name="now_playing_weather_unavailable">天气 · 暂不可用，稍后重试</string>
@@ -175,9 +204,60 @@
     <string name="now_playing_agenda_empty">今日安排 · 无待办日程</string>
     <string name="now_playing_agenda_events">今日安排 · %1$s</string>
     <string name="now_playing_agenda_unavailable">今日安排 · 日历暂不可用</string>
+    <string name="now_playing_battery">电量 · %1$d%%</string>
+    <string name="now_playing_battery_charging">电量 · %1$d%% · 充电中</string>
+    <string name="now_playing_battery_unavailable">电量信息暂不可用</string>
+    <string name="now_playing_alarm">下一次闹钟 · %1$s</string>
+    <string name="now_playing_alarm_none">下一次闹钟 · 未设置</string>
+    <string name="now_playing_ha_not_configured">Home Assistant · 尚未设置连接</string>
+    <string name="now_playing_ha_unavailable">Home Assistant · 暂时无法连接</string>
+    <string name="now_playing_ha_no_selection">Home Assistant · 尚未选择显示内容</string>
+    <string name="now_playing_ha_event">%1$s  %2$s</string>
+    <string name="now_playing_ha_todo_experimental">实验 · 提醒 %1$s：%2$s</string>
+    <string name="setting_ha_config">Home Assistant 连接</string>
+    <string name="setting_ha_config_subtitle">未连接</string>
+    <string name="setting_ha_config_help">输入 HA 地址和长期访问令牌。令牌使用 Android Keystore 加密保存在本机。建议使用 HTTPS；仅在可信局域网使用 HTTP。可输入逗号分隔的实体 ID。</string>
+    <string name="setting_ha_url_hint">服务器地址，例如 https://homeassistant.local:8123</string>
+    <string name="setting_ha_token_hint">长期访问令牌（留空则保留原令牌）</string>
+    <string name="setting_ha_entities_hint">显示实体，例如 sensor.temperature, light.living_room</string>
+    <string name="setting_ha_calendars_hint">日历实体，例如 calendar.family</string>
+    <string name="setting_ha_todos_hint">提醒实体，例如 todo.shopping（实验）</string>
+    <string name="setting_ha_entities">显示 HA 实体状态</string>
+    <string name="setting_ha_entities_subtitle">最多显示 4 个已填写的传感器或设备实体</string>
+    <string name="setting_ha_calendar">显示 HA 日历</string>
+    <string name="setting_ha_calendar_subtitle">显示未来 24 小时事件；iCloud 可先通过 HA CalDAV 接入</string>
+    <string name="setting_ha_todo">显示 HA 提醒（实验）</string>
+    <string name="setting_ha_todo_subtitle">试验性读取已选 todo 实体状态，兼容性取决于 HA 集成</string>
+    <string name="setting_ha_connected">Home Assistant 连接成功</string>
+    <string name="setting_ha_connection_failed">无法连接 Home Assistant，请检查地址、令牌和网络</string>
+    <string name="setting_ha_disconnect">断开并清除令牌</string>
+    <string name="now_playing_icloud_not_configured">iCloud 日历 · 尚未连接</string>
+    <string name="now_playing_icloud_unavailable">iCloud 日历 · 暂时无法连接</string>
+    <string name="now_playing_icloud_no_calendar">iCloud 日历 · 尚未选择日历</string>
+    <string name="now_playing_icloud_empty">iCloud 日历 · 未来 24 小时无活动</string>
+    <string name="now_playing_icloud_event">%1$s  %2$s</string>
+    <string name="setting_icloud_config">直接连接 iCloud 日历</string>
+    <string name="setting_icloud_config_subtitle">未连接</string>
+    <string name="setting_icloud_config_help">使用 Apple ID 邮箱和 App 专用密码连接，不需要 HA，也不要输入 Apple 账户主密码。请先在 account.apple.com 开启双重认证并生成专用密码。专用密码会通过 Android Keystore 加密保存在本机。</string>
+    <string name="setting_icloud_email_hint">Apple ID 邮箱</string>
+    <string name="setting_icloud_password_hint">App 专用密码（留空则使用已保存的密码）</string>
+    <string name="setting_icloud_sign_in">登录并读取日历</string>
+    <string name="setting_icloud_disconnect">断开并清除密码</string>
+    <string name="setting_icloud_credentials_required">请输入 Apple ID 邮箱和 App 专用密码</string>
+    <string name="setting_icloud_connection_failed">无法连接 iCloud，请检查邮箱、专用密码和网络</string>
+    <string name="setting_icloud_no_calendars">已连接，但没有发现可显示的日历</string>
+    <string name="setting_icloud_choose_calendars">选择要显示的日历</string>
+    <string name="setting_icloud_select_one">至少选择一个日历</string>
+    <string name="setting_icloud_connected">iCloud 日历已连接</string>
+    <string name="setting_icloud_calendar">显示 iCloud 日历</string>
+    <string name="setting_icloud_calendar_subtitle">直接从 iCloud 读取所选日历未来 24 小时的活动</string>
     <string name="setting_widget_style">小组件样式</string>
     <string name="setting_widget_style_minimal">简约</string>
     <string name="setting_widget_style_card">卡片</string>
+    <string name="setting_clock_battery">显示设备电量</string>
+    <string name="setting_clock_battery_subtitle">显示电池百分比和充电状态，无需额外权限</string>
+    <string name="setting_clock_next_alarm">显示下一次闹钟</string>
+    <string name="setting_clock_next_alarm_subtitle">只显示闹钟时间，不读取闹钟标签或日程内容</string>
     <string name="setting_weather_city">天气城市</string>
     <string name="setting_weather_city_hint">例如：上海</string>
     <string name="setting_weather_not_set">未设置</string>

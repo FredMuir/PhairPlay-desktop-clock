@@ -36,6 +36,7 @@ class DacpClient(context: Context, private val onReadyChanged: (Boolean) -> Unit
     @Volatile private var activeRemote: String? = null
     @Volatile private var resolvedHost: String? = null
     @Volatile private var resolvedPort: Int = 0
+    @Volatile private var enabled: Boolean = false
     private var discoveryListener: NsdManager.DiscoveryListener? = null
 
     /**
@@ -58,15 +59,39 @@ class DacpClient(context: Context, private val onReadyChanged: (Boolean) -> Unit
         resolvedHost = null
         resolvedPort = 0
         onReadyChanged(false)
-        Logger.i("DACP configured: id=$newDacpId — discovering iTunes_Ctrl_$newDacpId")
-        startDiscovery("iTunes_Ctrl_$newDacpId")
+        if (!enabled) {
+            Logger.i("DACP identity recorded; legacy control is disabled")
+            return
+        }
+        discoverConfiguredSender()
+    }
+
+    /** Enables/disables the opt-in legacy fallback without restarting the AirPlay receiver. */
+    fun setEnabled(value: Boolean) {
+        if (enabled == value) return
+        enabled = value
+        resolvedHost = null
+        resolvedPort = 0
+        if (value) discoverConfiguredSender() else {
+            stopDiscovery()
+            onReadyChanged(false)
+        }
+    }
+
+    private fun discoverConfiguredSender() {
+        if (!enabled) return
+        val id = dacpId ?: return
+        Logger.i("DACP configured: id=$id — discovering iTunes_Ctrl_$id")
+        startDiscovery("iTunes_Ctrl_$id")
     }
 
     /** True once we have a sender identity (so the UI can know remote control is available). */
-    val isAvailable: Boolean get() = activeRemote != null && resolvedHost != null && resolvedPort != 0
+    val isAvailable: Boolean get() = enabled && activeRemote != null && resolvedHost != null && resolvedPort != 0
+    val isEnabled: Boolean get() = enabled
 
     /** Sends a DACP command (e.g. "playpause", "nextitem"). No-op until the service is resolved. */
     fun sendCommand(command: String) {
+        if (!enabled) { Logger.d("DACP '$command' ignored — legacy control is disabled"); return }
         val token = activeRemote ?: run { Logger.d("DACP '$command' ignored — no sender"); return }
         val host = resolvedHost
         val port = resolvedPort

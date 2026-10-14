@@ -13,12 +13,8 @@ Choose checks based on the changed behavior and target device. UI-only changes c
 Unit tests run on your development machine. They mock Android APIs and test the logic in isolation.
 
 ```bash
-# Run all unit tests for both flavors
+# Run the protocol and parser tests
 ./gradlew test
-
-# Run unit tests for a specific flavor
-./gradlew testGoogletvDebugUnitTest
-./gradlew testFiretvDebugUnitTest
 
 # Run a single test class
 ./gradlew test --tests "com.phairplay.airplay.RtspHandlerTest"
@@ -51,14 +47,13 @@ adb devices
 
 ```bash
 ./gradlew :test-runner:test
-./gradlew :app:lintGoogletvDebug :app:lintFiretvDebug \
-  :app:assembleGoogletvDebug :app:assembleFiretvDebug
+./gradlew :app:lintDebug :app:assembleDebug
 ```
 
 GitHub Actions runs the same checks on `main`:
 
 - `JVM protocol tests`: fast protocol/parser/media-unit coverage through `:test-runner:test`
-- `Android lint & debug APKs`: Android lint and both debug APKs
+- `Android lint & debug APK`: Android lint and the universal debug APK
 
 The Android Gradle unit-test tasks are not used as CI gates because several tests
 exercise Android framework classes that are unstable on the host JVM. Use
@@ -108,16 +103,13 @@ Install the correct debug APK:
 
 ```bash
 # Google TV with AirPlay/Miracast only
-./gradlew assembleGoogletvDebug
+./gradlew :app:assembleDebug
 
 # Google TV with Cast enabled for real testing
-./gradlew assembleGoogletvDebug -Pphairplay.castAppId=<APP_ID>
+./gradlew :app:assembleDebug -Pphairplay.castAppId=<APP_ID>
 
 # Google TV
-adb install -r app/build/outputs/apk/googletv/debug/app-googletv-debug.apk
-
-# Fire TV
-adb install -r app/build/outputs/apk/firetv/debug/app-firetv-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 To get the Cast App ID, register the receiver in the Google Cast SDK Developer
@@ -129,7 +121,7 @@ After a failed run, collect diagnostics before restarting the app:
 ```bash
 tools/collect-device-logs.sh
 
-# Optional: force a package if both flavors are installed
+# Optional: force-stop and relaunch the universal package
 PHAIRPLAY_PACKAGE=com.phairplay.firetv tools/collect-device-logs.sh
 ```
 

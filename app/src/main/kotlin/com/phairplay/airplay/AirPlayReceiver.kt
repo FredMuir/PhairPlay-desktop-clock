@@ -107,7 +107,9 @@ class AirPlayReceiver(
     private val onPinChanged: (pin: String?) -> Unit = {},
     private val onRemoteControlAvailabilityChanged: (Boolean) -> Unit = {},
     private val onRemoteControlCommandsChanged: (Set<Int>?) -> Unit = {},
-    private val onRemotePlaybackChanged: (Boolean) -> Unit = {}
+    private val onRemotePlaybackChanged: (Boolean) -> Unit = {},
+    legacyDacpControlEnabled: Boolean = false,
+    airPlayRemoteControlsEnabled: Boolean = false
 ) {
 
     // Persistent store of paired controllers (for PIN access control / pair-verify).
@@ -136,6 +138,8 @@ class AirPlayReceiver(
 
     // Reverse remote control (TV → sender). Created lazily once a sender advertises DACP-ID.
     private val dacpClient = DacpClient(context) { publishRemoteControlAvailability() }
+    @Volatile private var remoteControlsEnabled = airPlayRemoteControlsEnabled
+    @Volatile private var legacyDacpControlRequested = legacyDacpControlEnabled
     @Volatile private var ntpClient: AirPlayNtpClient? = null
     @Volatile private var eventSocket: ServerSocket? = null
     @Volatile private var eventClientSocket: java.net.Socket? = null
@@ -147,6 +151,10 @@ class AirPlayReceiver(
     @Volatile private var mirrorAesKey: ByteArray? = null
     @Volatile private var mirrorEcdhSecret: ByteArray? = null
     @Volatile private var mirrorAesIv: ByteArray? = null
+
+    init {
+        dacpClient.setEnabled(remoteControlsEnabled && legacyDacpControlRequested)
+    }
 
     // ─── Now-playing (audio-only) state ──────────────────────────────────────
     // The now-playing card shows only when audio plays WITHOUT video. We track both stream kinds
@@ -208,13 +216,28 @@ class AirPlayReceiver(
         }
     }
 
-    /** Sends transport commands over AirPlay 2 MediaRemote, falling back to DACP for legacy senders. */
+    /** Sends modern MediaRemote commands; legacy DACP is an explicit opt-in fallback. */
     fun sendRemoteCommand(command: String) {
-        if (!sendEventRemoteCommand(command)) dacpClient.sendCommand(command)
+        if (!remoteControlsEnabled) return
+        if (!sendEventRemoteCommand(command) && dacpClient.isEnabled) dacpClient.sendCommand(command)
+    }
+
+    /** Applies the master transport-controls setting without restarting audio reception. */
+    fun setRemoteControlsEnabled(enabled: Boolean) {
+        remoteControlsEnabled = enabled
+        dacpClient.setEnabled(enabled && legacyDacpControlRequested)
+    }
+
+    /** Applies the legacy DACP setting without restarting an active AirPlay audio session. */
+    fun setLegacyDacpControlEnabled(enabled: Boolean) {
+        legacyDacpControlRequested = enabled
+        dacpClient.setEnabled(remoteControlsEnabled && enabled)
     }
 
     private fun publishRemoteControlAvailability() {
-        onRemoteControlAvailabilityChanged(dacpClient.isAvailable || eventClientSocket?.isConnected == true)
+        onRemoteControlAvailabilityChanged(
+            (dacpClient.isEnabled && dacpClient.isAvailable) || eventClientSocket?.isConnected == true
+        )
     }
 
     /** AirPlay 2's event channel carries modern MediaRemote commands; DACP remains the legacy fallback. */
@@ -302,7 +325,7 @@ class AirPlayReceiver(
 
     /** True while either modern event-channel or legacy DACP transport control is available. */
     fun isRemoteControlAvailable(): Boolean =
-        dacpClient.isAvailable || eventClientSocket?.isConnected == true
+        (dacpClient.isEnabled && dacpClient.isAvailable) || eventClientSocket?.isConnected == true
 
     /**
      * Re-registers the mDNS advertisement without touching the RTSP/timing servers.

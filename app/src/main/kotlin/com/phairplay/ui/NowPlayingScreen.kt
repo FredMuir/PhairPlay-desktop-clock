@@ -1,7 +1,11 @@
 package com.phairplay.ui
 
 import android.content.Context
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.app.AlarmManager
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -15,12 +19,15 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.view.MotionEvent
+import android.view.GestureDetector
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
 import android.text.method.ScrollingMovementMethod
 import androidx.core.content.ContextCompat
+import androidx.core.widget.TextViewCompat
 import java.net.URL
 import java.net.URLEncoder
 import java.util.Calendar
@@ -28,12 +35,17 @@ import java.util.Date
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
+import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import com.phairplay.R
 import com.phairplay.airplay.NowPlayingInfo
+import com.phairplay.integrations.HomeAssistant
+import com.phairplay.integrations.ICloudCalDav
 import com.phairplay.util.Logger
 
 /**
@@ -56,7 +68,11 @@ class NowPlayingScreen @JvmOverloads constructor(
     private var displayedArtworkTrackKey: String? = null
     private var backdropStart = Color.rgb(8, 14, 27)
     private var backdropEnd = Color.rgb(24, 32, 53)
+    private var baseBackdropStart = backdropStart
+    private var baseBackdropEnd = backdropEnd
     private var backdropAnimator: ValueAnimator? = null
+    private var ambientBackdropAnimator: ValueAnimator? = null
+    private var ambientPhase = 0f
     private var onVolumeChange: ((Float) -> Unit)? = null
     private var onReturnToApp: (() -> Unit)? = null
 
@@ -69,8 +85,20 @@ class NowPlayingScreen @JvmOverloads constructor(
     private val volumeSlider: SeekBar
     private val volumeTrack: FrameLayout
     private val volumeColumn: LinearLayout
+    private val transportControls: LinearLayout
+    private val playPauseButton: ImageButton
+    private var onRemoteCommand: ((String) -> Unit)? = null
+    private var remoteControlsAvailable = false
+    private var remoteControlsEnabled = false
     private lateinit var clockView: TextView
     private lateinit var widgets: TextView
+    private lateinit var pageTabs: LinearLayout
+    private lateinit var pageTabsScroll: HorizontalScrollView
+    private var infoPages: List<Pair<String, List<String>>> = emptyList()
+    private var selectedInfoPage = 0
+    private var renderedPageLabels: List<String> = emptyList()
+    private var renderedSelectedPage = -1
+    private var clockBaseSizeSp = CLOCK_SP
     private val widgetHandler = Handler(Looper.getMainLooper())
     private var clockEnabled = true
     private var dateEnabled = true
@@ -83,30 +111,78 @@ class NowPlayingScreen @JvmOverloads constructor(
     private var weatherRetryScheduledFor: String? = null
     private var idleClockMode = false
     private var showClockSeconds = false
+    private var batteryEnabled = false
+    private var nextAlarmEnabled = false
+    private var batteryText: String? = null
+    private var nextAlarmText: String? = null
+    private var lastAlarmRefreshAt = 0L
+    private var systemInfoReceiverRegistered = false
+    private lateinit var clockContentColumn: LinearLayout
+    private lateinit var pageTabsLeftFade: View
+    private lateinit var pageTabsRightFade: View
     @Volatile private var weatherText: String? = null
     @Volatile private var agendaText: String? = null
+    private var haEnabled = false
+    private var haCalendarEnabled = false
+    private var haTodoEnabled = false
+    private var haUrl = ""
+    private var haEntities = ""
+    private var haCalendars = ""
+    private var haTodos = ""
+    @Volatile private var haDeviceText: String? = null
+    @Volatile private var haScheduleText: String? = null
+    @Volatile private var haPending = false
+    private var lastHaRefreshAt = 0L
+    private var iCloudEnabled = false
+    private var iCloudEmail = ""
+    private var iCloudCalendarHrefs = ""
+    @Volatile private var iCloudText: String? = null
+    @Volatile private var iCloudPending = false
+    private var lastICloudRefreshAt = 0L
     private var lastWeatherCity = ""
     @Volatile private var agendaQueryPending = false
     private var lastAgendaQueryAt = 0L
     private val weatherExecutor = Executors.newSingleThreadExecutor()
     private val clockTick = object : Runnable { override fun run() { refreshWidgets(); widgetHandler.postDelayed(this, 1000) } }
+    private val systemInfoReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_BATTERY_CHANGED -> refreshBatteryText(intent)
+                AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED,
+                Intent.ACTION_TIME_CHANGED,
+                Intent.ACTION_TIMEZONE_CHANGED,
+                Intent.ACTION_DATE_CHANGED -> {
+                    lastAlarmRefreshAt = 0L
+                    refreshWidgets()
+                }
+            }
+        }
+    }
 
     init {
         background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
             intArrayOf(backdropStart, backdropEnd, Color.rgb(8, 12, 22)))
+        // This full-screen overlay sits above the app's navigation and settings pages.
+        // Consume touches that miss a child control so they cannot activate controls below.
+        isClickable = true
 
         val returnButton = android.widget.Button(context).apply {
-            text = context.getString(R.string.now_playing_return)
+            text = context.getString(R.string.now_playing_return_short)
+            contentDescription = context.getString(R.string.now_playing_return)
+            textSize = 14f
+            isAllCaps = false
+            isSingleLine = true
+            gravity = Gravity.CENTER
             isFocusable = true
-            background = glassBackground(28)
-            setTextColor(Color.WHITE)
-            setPadding(dp(18), 0, dp(18), 0)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(16).toFloat()
+                setColor(color(R.color.accent_blue))
+            }
+            setTextColor(color(R.color.background_dark))
+            setPadding(0, 0, 0, 0)
             setOnClickListener { onReturnToApp?.invoke() }
         }
-        addView(returnButton, LayoutParams(LayoutParams.WRAP_CONTENT, dp(52), Gravity.TOP or Gravity.START).apply {
-            topMargin = dp(16)
-            marginStart = dp(20)
-        })
 
         val column = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -130,25 +206,50 @@ class NowPlayingScreen @JvmOverloads constructor(
             typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
             maxLines = 1
             gravity = Gravity.START
-            setPadding(0, 0, 0, dp(2))
+            setPadding(dp(16), 0, dp(16), dp(2))
         }
         titleView = textView(TITLE_SP, R.color.text_primary, bold = true).apply {
             setPadding(0, dp(16), 0, 0)
             minHeight = dp(82)
             maxLines = Int.MAX_VALUE
-            movementMethod = ScrollingMovementMethod()
-            maxHeight = dp(118)
-            scrollBarStyle = View.SCROLLBARS_INSIDE_INSET
-            isVerticalScrollBarEnabled = true
         }
         artistView = textView(ARTIST_SP, R.color.text_secondary).apply {
             setPadding(0, dp(12), 0, 0)
             minHeight = dp(40)
+            maxLines = Int.MAX_VALUE
         }
         albumView = textView(ALBUM_SP, R.color.text_tertiary).apply {
             setPadding(0, dp(2), 0, 0)
             minHeight = dp(42)
+            maxLines = Int.MAX_VALUE
         }
+        transportControls = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = glassBackground(28)
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        }
+        fun transportButton(icon: Int, description: Int, command: String, sizeDp: Int = 52) =
+            ImageButton(context).apply {
+                setImageResource(icon)
+                contentDescription = context.getString(description)
+                background = ContextCompat.getDrawable(context, R.drawable.focus_ring_selector)
+                imageTintList = ContextCompat.getColorStateList(context, R.color.transport_icon_tint)
+                isFocusable = true
+                isEnabled = false
+                setOnClickListener { onRemoteCommand?.invoke(command) }
+                layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp)).apply {
+                    marginStart = dp(4); marginEnd = dp(4)
+                }
+            }
+        transportControls.addView(transportButton(R.drawable.ic_transport_previous,
+            R.string.now_playing_previous, com.phairplay.airplay.DacpClient.CMD_PREV))
+        playPauseButton = transportButton(R.drawable.ic_transport_pause,
+            R.string.now_playing_pause, com.phairplay.airplay.DacpClient.CMD_PLAY_PAUSE, 60)
+        transportControls.addView(playPauseButton)
+        transportControls.addView(transportButton(R.drawable.ic_transport_next,
+            R.string.now_playing_next, com.phairplay.airplay.DacpClient.CMD_NEXT))
+        transportControls.visibility = View.GONE
         volumeCaption = textView(VOLUME_SP, R.color.text_secondary).apply {
             text = context.getString(R.string.now_playing_volume_caption)
             gravity = Gravity.CENTER
@@ -191,11 +292,55 @@ class NowPlayingScreen @JvmOverloads constructor(
         volumeColumn.addView(volumeLabel, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(22)))
         volumeColumn.addView(volumeTrack, LinearLayout.LayoutParams(dp(58), dp(250)))
         widgets = textView(22f, R.color.text_secondary).apply {
-            setPadding(0, dp(4), 0, dp(8))
+            setPadding(dp(16), dp(4), dp(16), dp(8))
             maxLines = Int.MAX_VALUE
             movementMethod = ScrollingMovementMethod()
             isVerticalScrollBarEnabled = true
             gravity = Gravity.START
+        }
+
+        pageTabs = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        }
+        pageTabsScroll = HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            isHorizontalFadingEdgeEnabled = true
+            setFadingEdgeLength(dp(20))
+            clipToPadding = false
+            setPadding(dp(8), 0, dp(8), 0)
+            addView(pageTabs, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+            visibility = View.GONE
+        }
+        val pageTabsFadeLayer = FrameLayout(context).apply {
+            addView(pageTabsScroll, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            pageTabsLeftFade = View(context).apply {
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                background = edgeFade(backdropStart, left = true)
+                visibility = View.GONE
+            }
+            pageTabsRightFade = View(context).apply {
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                background = edgeFade(backdropStart, left = false)
+                visibility = View.GONE
+            }
+            addView(pageTabsLeftFade, FrameLayout.LayoutParams(dp(18), LayoutParams.MATCH_PARENT, Gravity.START))
+            addView(pageTabsRightFade, FrameLayout.LayoutParams(dp(18), LayoutParams.MATCH_PARENT, Gravity.END))
+            pageTabsScroll.setOnScrollChangeListener { _, _, _, _, _ -> updatePageTabFades() }
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { updatePageTabFades() } }
+            pageTabs.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post { updatePageTabFades() } }
+        }
+        val swipeDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 == null || kotlin.math.abs(e2.x - e1.x) < dp(48) || kotlin.math.abs(velocityX) < dp(120)) return false
+                showInfoPage(selectedInfoPage + if (velocityX < 0) 1 else -1)
+                return true
+            }
+        })
+        widgets.setOnTouchListener { _, event ->
+            val gestureHandled = swipeDetector.onTouchEvent(event)
+            gestureHandled && event.actionMasked == MotionEvent.ACTION_UP
         }
 
         details.addView(clockView)
@@ -203,20 +348,42 @@ class NowPlayingScreen @JvmOverloads constructor(
         details.addView(titleView)
         details.addView(artistView)
         details.addView(albumView)
+        details.addView(transportControls)
         column.addView(artwork)
         column.addView(details)
 
-        addView(
-            column,
-            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.CENTER
-            }
-        )
+        val scrollContent = FrameLayout(context).apply {
+            clipChildren = false
+            clipToPadding = false
+            addView(column, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        }
+        val scrollViewport = ScrollView(context).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            isVerticalFadingEdgeEnabled = true
+            setFadingEdgeLength(dp(20))
+            clipChildren = false
+            clipToPadding = false
+            addView(scrollContent, FrameLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        addView(scrollViewport, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(volumeColumn, LayoutParams(dp(80), LayoutParams.WRAP_CONTENT, Gravity.END or Gravity.CENTER_VERTICAL).apply {
             marginEnd = dp(18)
         })
-        widgetHandler.post(clockTick)
-        addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> adaptOrientation(column) }
+        val topControls = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(8), dp(8), 0)
+            addView(returnButton, LinearLayout.LayoutParams(dp(INFO_TAB_WIDTH_DP), dp(INFO_TAB_HEIGHT_DP)).apply {
+                marginEnd = dp(4)
+            })
+            addView(pageTabsFadeLayer, LinearLayout.LayoutParams(0, dp(INFO_TAB_HEIGHT_DP), 1f))
+        }
+        addView(topControls, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        clockContentColumn = column
+        addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> adaptOrientation(column, scrollViewport) }
     }
 
     /** Connects the on-screen volume slider to the receiver's local AudioTrack gain. */
@@ -228,6 +395,36 @@ class NowPlayingScreen @JvmOverloads constructor(
         onReturnToApp = handler
     }
 
+    fun setRemoteCommandHandler(handler: (String) -> Unit) {
+        onRemoteCommand = handler
+    }
+
+    fun setRemoteControlsAvailable(available: Boolean) {
+        remoteControlsAvailable = available
+        updateTransportControls()
+    }
+
+    fun setRemoteControlsEnabled(enabled: Boolean) {
+        remoteControlsEnabled = enabled
+        updateTransportControls()
+    }
+
+    private fun updateTransportControls() {
+        // The idle bedside clock has no playback session to control. Keeping this wide row
+        // visible there also consumes the horizontal space needed by the clock and widgets.
+        transportControls.visibility = if (remoteControlsEnabled && !idleClockMode) View.VISIBLE else View.GONE
+        val canSend = remoteControlsEnabled && remoteControlsAvailable && !idleClockMode
+        for (i in 0 until transportControls.childCount) {
+            transportControls.getChildAt(i).isEnabled = canSend
+        }
+    }
+
+    fun setRemotePlaybackActive(playing: Boolean) {
+        playPauseButton.setImageResource(if (playing) R.drawable.ic_transport_pause else R.drawable.ic_transport_play)
+        playPauseButton.contentDescription = context.getString(
+            if (playing) R.string.now_playing_pause else R.string.now_playing_play)
+    }
+
     /** Turns the playback card into a standalone bedside clock when there is no active stream. */
     fun setBedsideClockMode(idle: Boolean) {
         idleClockMode = idle
@@ -236,7 +433,9 @@ class NowPlayingScreen @JvmOverloads constructor(
         artistView.visibility = if (idle) View.GONE else View.VISIBLE
         albumView.visibility = if (idle) View.GONE else View.VISIBLE
         volumeColumn.visibility = if (idle) View.GONE else View.VISIBLE
-        clockView.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (idle) 148f else if (isLandscapeUi()) 120f else 84f)
+        updateTransportControls()
+        clockBaseSizeSp = if (idle) 148f else if (isLandscapeUi()) 120f else 84f
+        updateClockAutoSize()
     }
 
     fun setWidgetSettings(clock: Boolean, date: Boolean, agenda: Boolean, weather: Boolean, city: String, style: String, seconds: Boolean = false) {
@@ -247,31 +446,362 @@ class NowPlayingScreen @JvmOverloads constructor(
         refreshWidgets()
     }
 
+    fun setClockInfoSettings(battery: Boolean, nextAlarm: Boolean) {
+        batteryEnabled = battery
+        nextAlarmEnabled = nextAlarm
+        if (battery) refreshBatteryText(null)
+        if (!nextAlarm) nextAlarmText = null
+        lastAlarmRefreshAt = 0L
+        refreshWidgets()
+    }
+
+    fun setHomeAssistantSettings(enabled: Boolean, url: String, entities: String, calendarEnabled: Boolean,
+                                 calendars: String, todoEnabled: Boolean, todos: String) {
+        haEnabled = enabled
+        haUrl = url
+        haEntities = entities
+        haCalendarEnabled = calendarEnabled
+        haCalendars = calendars
+        haTodoEnabled = todoEnabled
+        haTodos = todos
+        lastHaRefreshAt = 0L
+        if (!enabled) { haDeviceText = null; haScheduleText = null }
+        refreshWidgets()
+    }
+
+    fun setICloudSettings(enabled: Boolean, email: String, calendarHrefs: String) {
+        iCloudEnabled = enabled
+        iCloudEmail = email
+        iCloudCalendarHrefs = calendarHrefs
+        lastICloudRefreshAt = 0L
+        if (!enabled) iCloudText = null
+        refreshWidgets()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!systemInfoReceiverRegistered) {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_BATTERY_CHANGED)
+                addAction(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED)
+                addAction(Intent.ACTION_TIME_CHANGED)
+                addAction(Intent.ACTION_TIMEZONE_CHANGED)
+                addAction(Intent.ACTION_DATE_CHANGED)
+            }
+            val stickyBattery = ContextCompat.registerReceiver(
+                context, systemInfoReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+            systemInfoReceiverRegistered = true
+            refreshBatteryText(stickyBattery)
+        }
+        widgetHandler.removeCallbacks(clockTick)
+        widgetHandler.post(clockTick)
+    }
+
+    override fun onDetachedFromWindow() {
+        stopAmbientBackdropAnimation()
+        widgetHandler.removeCallbacks(clockTick)
+        if (systemInfoReceiverRegistered) {
+            runCatching { context.unregisterReceiver(systemInfoReceiver) }
+            systemInfoReceiverRegistered = false
+        }
+        super.onDetachedFromWindow()
+    }
+
+    private fun refreshBatteryText(intent: Intent?) {
+        if (!batteryEnabled) return
+        val battery = intent ?: context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+        if (level < 0 || scale <= 0) {
+            batteryText = context.getString(R.string.now_playing_battery_unavailable)
+        } else {
+            val percent = (level * 100f / scale).roundToInt().coerceIn(0, 100)
+            val status = battery!!.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+            batteryText = context.getString(
+                if (status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == android.os.BatteryManager.BATTERY_STATUS_FULL) R.string.now_playing_battery_charging
+                else R.string.now_playing_battery, percent)
+        }
+        if (::widgets.isInitialized) refreshWidgets()
+    }
+
     private fun refreshWidgets() {
         if (!::widgets.isInitialized) return
-        val lines = mutableListOf<String>()
-        val now = java.time.LocalDateTime.now()
+        val timeLines = mutableListOf<String>()
+        val scheduleLines = mutableListOf<String>()
+        val weatherLines = mutableListOf<String>()
+        val deviceLines = mutableListOf<String>()
         val nowMillis = System.currentTimeMillis()
-        val clockText = if (clockEnabled) now.format(java.time.format.DateTimeFormatter.ofPattern(if (showClockSeconds) "HH:mm:ss" else "HH:mm")) else ""
+        val now = java.util.Date(nowMillis)
+        val locale = java.util.Locale.getDefault()
+        val is24Hour = android.text.format.DateFormat.is24HourFormat(context)
+        val clockPattern = when {
+            showClockSeconds && is24Hour -> "HH:mm:ss"
+            showClockSeconds -> "h:mm:ss a"
+            is24Hour -> "HH:mm"
+            else -> "h:mm a"
+        }
+        val clockText = if (clockEnabled) java.text.SimpleDateFormat(clockPattern, locale).format(now) else ""
         if (clockView.text.toString() != clockText) clockView.text = clockText
         clockView.visibility = if (clockEnabled) View.VISIBLE else View.GONE
-        val locale = java.util.Locale.getDefault()
-        if (dateEnabled) lines += now.format(java.time.format.DateTimeFormatter.ofPattern(
-            android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMd EEEE"), locale))
-        if (weatherEnabled) lines += if (weatherCity.isBlank()) context.getString(R.string.now_playing_weather_city_missing)
+        if (dateEnabled) {
+            // The bedside clock places its widgets beside the clock on landscape screens.
+            // A full weekday can wrap awkwardly at large system font scales, so use the
+            // locale's abbreviated weekday there while keeping the complete date elsewhere.
+            val dateSkeleton = if (idleClockMode && isLandscapeUi()) "MMMd EEE" else "yMMMd EEEE"
+            timeLines += java.text.SimpleDateFormat(
+                android.text.format.DateFormat.getBestDateTimePattern(locale, dateSkeleton), locale).format(now)
+        }
+        if (weatherEnabled) weatherLines += if (weatherCity.isBlank()) context.getString(R.string.now_playing_weather_city_missing)
             else weatherText ?: context.getString(R.string.now_playing_weather_loading, weatherCity)
         if (agendaEnabled) {
             if (nowMillis - lastAgendaQueryAt >= 60_000L) loadAgenda(nowMillis)
-            lines += agendaText ?: context.getString(R.string.now_playing_agenda_loading)
+            scheduleLines += agendaText ?: context.getString(R.string.now_playing_agenda_loading)
         } else {
             agendaText = null
             lastAgendaQueryAt = 0L
         }
-        val widgetText = lines.joinToString("\n")
-        if (widgets.text.toString() != widgetText) widgets.text = widgetText
-        widgets.visibility = if (lines.isEmpty()) View.GONE else View.VISIBLE
+        if (batteryEnabled) timeLines += batteryText ?: context.getString(R.string.now_playing_battery_unavailable)
+        if (nextAlarmEnabled) {
+            if (nowMillis - lastAlarmRefreshAt >= 60_000L || nextAlarmText == null) refreshNextAlarm(nowMillis)
+            timeLines += nextAlarmText ?: context.getString(R.string.now_playing_alarm_none)
+        }
+        if (haEnabled) {
+            if (nowMillis - lastHaRefreshAt >= 60_000L && !haPending) loadHomeAssistant(nowMillis)
+            if (haEntities.isNotBlank()) deviceLines += haDeviceText ?: context.getString(R.string.now_playing_ha_loading)
+            if (haCalendarEnabled || haTodoEnabled) scheduleLines += haScheduleText ?: context.getString(R.string.now_playing_ha_loading)
+        }
+        if (iCloudEnabled) {
+            if (nowMillis - lastICloudRefreshAt >= 15 * 60_000L && !iCloudPending) loadICloudCalendar(nowMillis)
+            scheduleLines += iCloudText ?: context.getString(R.string.now_playing_icloud_loading)
+        }
+        val pages = mutableListOf<Pair<String, List<String>>>()
+        if (timeLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_time) to timeLines
+        if (scheduleLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_schedule) to scheduleLines
+        if (weatherLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_weather) to weatherLines
+        if (deviceLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_devices) to deviceLines
+        if (pages.map { it.first } != infoPages.map { it.first }) selectedInfoPage = selectedInfoPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+        infoPages = pages
+        updateInfoPageControls()
         val bg = if (widgetStyle == "CARD") glassBackground(24) else null
         widgets.background = bg
+        updateBurnInOffset(nowMillis)
+    }
+
+    private fun updateInfoPageControls() {
+        if (!::pageTabs.isInitialized) return
+        pageTabs.visibility = View.VISIBLE
+        pageTabsScroll.visibility = View.VISIBLE
+        val labels = infoPages.map { it.first }
+        if (labels != renderedPageLabels) {
+            pageTabs.removeAllViews()
+            infoPages.forEachIndexed { index, page ->
+                val tab = TextView(context).apply {
+                    text = page.first
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    isFocusable = true
+                    isClickable = true
+                    background = ContextCompat.getDrawable(context, R.drawable.focus_ring_selector)
+                    setPadding(dp(4), 0, dp(4), 0)
+                    setOnClickListener { showInfoPage(index) }
+                }
+                pageTabs.addView(tab, LinearLayout.LayoutParams(dp(INFO_TAB_WIDTH_DP), dp(INFO_TAB_HEIGHT_DP)).apply {
+                    marginStart = dp(4); marginEnd = dp(4)
+                })
+            }
+            renderedPageLabels = labels
+            renderedSelectedPage = -1
+        }
+        if (renderedSelectedPage != selectedInfoPage) {
+            infoPages.forEachIndexed { index, page ->
+                val tab = pageTabs.getChildAt(index) as? TextView ?: return@forEachIndexed
+                tab.setTextColor(color(if (index == selectedInfoPage) R.color.text_primary else R.color.text_secondary))
+                tab.background = if (index == selectedInfoPage) glassBackground(18)
+                    else ContextCompat.getDrawable(context, R.drawable.focus_ring_selector)
+                tab.isSelected = index == selectedInfoPage
+                tab.contentDescription = context.getString(
+                    R.string.now_playing_info_page_accessibility, page.first, index + 1, infoPages.size)
+            }
+            renderedSelectedPage = selectedInfoPage
+        }
+        val lines = infoPages.getOrNull(selectedInfoPage)?.second.orEmpty()
+        widgets.text = lines.joinToString("\n")
+        widgets.visibility = if (lines.isEmpty()) View.GONE else View.VISIBLE
+        pageTabsScroll.post { updatePageTabFades() }
+    }
+
+    private fun showInfoPage(index: Int) {
+        if (infoPages.isEmpty()) return
+        selectedInfoPage = Math.floorMod(index, infoPages.size)
+        updateInfoPageControls()
+        pageTabs.getChildAt(selectedInfoPage)?.let { pageTabsScroll.smoothScrollTo(it.left - dp(12), 0) }
+    }
+
+    private fun loadHomeAssistant(nowMillis: Long) {
+        val token = HomeAssistant.token(context) ?: run {
+            haDeviceText = context.getString(R.string.now_playing_ha_not_configured)
+            haScheduleText = context.getString(R.string.now_playing_ha_not_configured)
+            return
+        }
+        if (haUrl.isBlank()) return
+        lastHaRefreshAt = nowMillis
+        haPending = true
+        val url = haUrl
+        val entities = haEntities.split(',', '\n').map { it.trim() }.filter { it.matches(Regex("[a-z_]+\\.[a-zA-Z0-9_]+")) }.take(4)
+        val calendars = if (haCalendarEnabled) haCalendars.split(',', '\n').map(String::trim).filter { it.startsWith("calendar.") }.take(3) else emptyList()
+        val todos = if (haTodoEnabled) haTodos.split(',', '\n').map(String::trim).filter { it.startsWith("todo.") }.take(3) else emptyList()
+        weatherExecutor.execute {
+            val result = runCatching {
+                val deviceLines = mutableListOf<String>()
+                val scheduleLines = mutableListOf<String>()
+                entities.forEach { id ->
+                    val state = HomeAssistant.state(url, token, id)
+                    val attrs = state.optJSONObject("attributes")
+                    val title = attrs?.optString("friendly_name").orEmpty().ifBlank { id }
+                    deviceLines += "$title: ${state.optString("state")}"
+                }
+                val start = java.time.Instant.ofEpochMilli(nowMillis).toString()
+                val end = java.time.Instant.ofEpochMilli(nowMillis + 86_400_000L).toString()
+                calendars.forEach { id ->
+                    HomeAssistant.calendars(url, token, id, start, end).let { events ->
+                        for (i in 0 until minOf(events.length(), 2)) {
+                            val event = events.optJSONObject(i) ?: continue
+                            val summary = event.optString("summary").ifBlank { context.getString(R.string.now_playing_agenda_untitled) }
+                            val time = event.optString("start").let { if (it.length >= 16) it.substring(11, 16) else "" }
+                            scheduleLines += context.getString(R.string.now_playing_ha_event, time, summary)
+                        }
+                    }
+                }
+                todos.forEach { id ->
+                    val state = HomeAssistant.state(url, token, id)
+                    val title = state.optJSONObject("attributes")?.optString("friendly_name").orEmpty().ifBlank { id }
+                    scheduleLines += context.getString(R.string.now_playing_ha_todo_experimental, title, state.optString("state"))
+                }
+                deviceLines.joinToString("\n") to scheduleLines.joinToString("\n")
+            }.getOrElse { context.getString(R.string.now_playing_ha_unavailable) to context.getString(R.string.now_playing_ha_unavailable) }
+            widgetHandler.post {
+                haPending = false
+                if (haEnabled) {
+                    haDeviceText = result.first.ifBlank { if (haEntities.isBlank()) null else context.getString(R.string.now_playing_ha_no_selection) }
+                    haScheduleText = result.second.ifBlank { if (haCalendarEnabled || haTodoEnabled) context.getString(R.string.now_playing_ha_no_selection) else null }
+                    refreshWidgets()
+                }
+            }
+        }
+    }
+
+    private fun loadICloudCalendar(nowMillis: Long) {
+        val password = ICloudCalDav.password(context) ?: run {
+            iCloudText = context.getString(R.string.now_playing_icloud_not_configured)
+            return
+        }
+        if (iCloudEmail.isBlank()) return
+        val hrefs = runCatching {
+            val json = org.json.JSONArray(iCloudCalendarHrefs)
+            (0 until json.length()).mapNotNull { json.optJSONObject(it)?.optString("href")?.takeIf(String::isNotBlank) }
+        }.getOrDefault(emptyList())
+        if (hrefs.isEmpty()) {
+            iCloudText = context.getString(R.string.now_playing_icloud_no_calendar)
+            return
+        }
+        lastICloudRefreshAt = nowMillis
+        iCloudPending = true
+        val email = iCloudEmail
+        weatherExecutor.execute {
+            val result = runCatching {
+                val events = ICloudCalDav.fetchEvents(email, password, hrefs, nowMillis, nowMillis + 24 * 60 * 60_000L).take(3)
+                if (events.isEmpty()) context.getString(R.string.now_playing_icloud_empty)
+                else events.joinToString("\n") { event ->
+                    val time = if (event.allDay) context.getString(R.string.now_playing_agenda_all_day)
+                        else android.text.format.DateFormat.getTimeFormat(context).format(Date(event.startMillis))
+                    context.getString(R.string.now_playing_icloud_event, time, event.title)
+                }
+            }.getOrElse { context.getString(R.string.now_playing_icloud_unavailable) }
+            widgetHandler.post {
+                iCloudPending = false
+                if (iCloudEnabled) { iCloudText = result; refreshWidgets() }
+            }
+        }
+    }
+
+    private fun refreshNextAlarm(nowMillis: Long) {
+        lastAlarmRefreshAt = nowMillis
+        val alarm = runCatching {
+            (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).nextAlarmClock
+        }.getOrNull()
+        nextAlarmText = if (alarm == null) context.getString(R.string.now_playing_alarm_none)
+        else context.getString(R.string.now_playing_alarm, android.text.format.DateFormat.getTimeFormat(context).format(Date(alarm.triggerTime)))
+    }
+
+    private fun updateBurnInOffset(nowMillis: Long) {
+        if (!::clockContentColumn.isInitialized) return
+        if (!idleClockMode && infoPages.isEmpty()) {
+            clockContentColumn.translationX = 0f
+            clockContentColumn.translationY = 0f
+            return
+        }
+        // Slowly drift the information content by a few pixels to reduce static OLED pixels.
+        val elapsedMinutes = nowMillis / 60_000.0
+        val x = kotlin.math.sin(elapsedMinutes * (2.0 * Math.PI / 17.0)) * 3.0
+        val y = kotlin.math.sin(elapsedMinutes * (2.0 * Math.PI / 23.0) + 1.2) * 2.0
+        clockContentColumn.translationX = dp(3).toFloat() * (x / 3.0).toFloat()
+        clockContentColumn.translationY = dp(2).toFloat() * (y / 2.0).toFloat()
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (changedView !== this) return
+        if (visibility == View.VISIBLE && isAttachedToWindow) startAmbientBackdropAnimation()
+        else stopAmbientBackdropAnimation()
+    }
+
+    /** Gently shifts the dark wallpaper through nearby hues while keeping contrast stable. */
+    private fun startAmbientBackdropAnimation() {
+        if (ambientBackdropAnimator?.isStarted == true) return
+        ambientBackdropAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 16_000L
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = android.view.animation.LinearInterpolator()
+            addUpdateListener { _ ->
+                val elapsed = android.os.SystemClock.elapsedRealtime()
+                val cycle = (elapsed % (30L * 60L * 1000L)).toFloat() / (30f * 60f * 1000f)
+                ambientPhase = ((kotlin.math.sin(cycle * (2f * Math.PI.toFloat())) + 1f) / 2f)
+                applyAmbientBackdrop()
+            }
+            start()
+        }
+    }
+
+    private fun stopAmbientBackdropAnimation() {
+        ambientBackdropAnimator?.cancel()
+        ambientBackdropAnimator = null
+        ambientPhase = 0f
+        renderBackdrop(baseBackdropStart, baseBackdropEnd)
+    }
+
+    private fun applyAmbientBackdrop() {
+        val teal = Color.rgb(12, 35, 43)
+        val violet = Color.rgb(33, 22, 47)
+        val tint = android.animation.ArgbEvaluator().evaluate(ambientPhase, teal, violet) as Int
+        renderBackdrop(blend(baseBackdropStart, tint, 0.16f), blend(baseBackdropEnd, tint, 0.12f))
+    }
+
+    private fun renderBackdrop(start: Int, end: Int) {
+        background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            intArrayOf(start, end, blend(Color.rgb(8, 12, 22), end, 0.28f)))
+        backdropStart = start
+        backdropEnd = end
+        if (::pageTabsLeftFade.isInitialized && ::pageTabsRightFade.isInitialized) {
+            pageTabsLeftFade.background = edgeFade(start, left = true)
+            pageTabsRightFade.background = edgeFade(start, left = false)
+        }
+    }
+
+    private fun updateClockAutoSize() {
+        if (!::clockView.isInitialized) return
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+            clockView, 48, clockBaseSizeSp.toInt(), 1, TypedValue.COMPLEX_UNIT_SP)
     }
 
     private fun loadAgenda(requestedAt: Long) {
@@ -391,7 +921,7 @@ class NowPlayingScreen @JvmOverloads constructor(
         }, WEATHER_RETRY_DELAY_MS)
     }
 
-    private fun adaptOrientation(column: LinearLayout) {
+    private fun adaptOrientation(column: LinearLayout, scrollViewport: ScrollView) {
         val landscape = isLandscapeUi()
         val bedsideLandscape = idleClockMode && landscape
         column.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
@@ -399,27 +929,64 @@ class NowPlayingScreen @JvmOverloads constructor(
         val availableWidth = (width / density).toInt().coerceAtLeast(320)
         val availableWidthDp = availableWidth.toFloat()
         val availableHeight = (height / density).toInt().coerceAtLeast(320)
-        val art = if (landscape) (availableHeight * 0.62f).toInt().coerceIn(300, 440)
-            else (availableWidth * 0.58f).toInt().coerceIn(220, 360)
-        val clockSize = if (idleClockMode) if (landscape) 164f else 112f else if (landscape) 120f else 84f
-        clockView.setTextSize(TypedValue.COMPLEX_UNIT_SP, clockSize)
-        titleView.maxHeight = dp(if (landscape) 118 else 84)
+        scrollViewport.clipToPadding = true
+        scrollViewport.setPadding(0, dp(if (landscape) 72 else 84), 0, dp(if (landscape) 16 else 104))
+        val volumeRailReserve = 98f // 80dp rail + 18dp end inset
+        val portraitSideInset = 16f
+        val compactPortrait = !landscape && availableWidthDp < 720f
+        val shortPortrait = !landscape && availableHeight < 720
+        val compactPortraitContentWidth = (availableWidthDp - portraitSideInset * 2f).coerceAtLeast(240f)
+        // Phone landscape windows have little vertical room. The TV/tablet minimum art
+        // size and type scale otherwise make the centered card extend beyond the screen.
+        val shortLandscape = landscape && availableHeight < 500
+        val art = if (landscape) (availableHeight * if (shortLandscape) 0.50f else 0.62f).toInt()
+            .coerceIn(if (shortLandscape) 160 else 300, if (shortLandscape) 240 else 440)
+            else minOf((availableWidth * 0.58f).toInt().coerceIn(220, 360), compactPortraitContentWidth.toInt(),
+                if (shortPortrait) 160 else 360)
+                .coerceAtLeast(160)
+        val clockSize = when {
+            idleClockMode && landscape && shortLandscape -> 112f
+            idleClockMode && landscape -> 164f
+            idleClockMode -> 148f
+            shortPortrait -> 64f
+            landscape && shortLandscape -> 72f
+            landscape -> 120f
+            else -> 84f
+        }
+        clockBaseSizeSp = clockSize
+        updateClockAutoSize()
+        // Let the containing ScrollView handle long metadata so text is never clipped
+        // between the fixed return button and volume rail on short screens.
+        titleView.maxHeight = Int.MAX_VALUE
+        titleView.movementMethod = null
+        titleView.isVerticalScrollBarEnabled = false
+        artistView.maxHeight = Int.MAX_VALUE
+        albumView.maxHeight = Int.MAX_VALUE
+        artistView.movementMethod = null
+        albumView.movementMethod = null
+        artistView.isVerticalScrollBarEnabled = false
+        albumView.isVerticalScrollBarEnabled = false
         (artwork.layoutParams as LinearLayout.LayoutParams).apply { width = dp(art); height = dp(art); artwork.layoutParams = this }
         // Keep the content column clear of the volume rail. On wider tablets use the
         // centered 1050dp composition; on narrower landscape windows reserve both the rail
         // and a 32dp gap, then pin the content to the left safe area.
-        val volumeRailReserve = 98f // 80dp rail + 18dp end inset
         val sideInset = 32f
         val centeredLayoutMinWidth = 1050f + volumeRailReserve + sideInset * 2f
-        val compactLandscape = landscape && availableWidthDp < centeredLayoutMinWidth
+        val compactLandscape = landscape && (availableWidthDp < centeredLayoutMinWidth || availableHeight < 500)
         val contentWidth = when {
             landscape -> minOf(1050f, availableWidthDp - volumeRailReserve - sideInset * 2f).coerceAtLeast(320f)
+            compactPortrait -> compactPortraitContentWidth
             else -> minOf(500f, availableWidthDp).coerceAtLeast(320f)
         }
         val maxWidth = dp(contentWidth.roundToInt())
         val lp = column.layoutParams as? LayoutParams ?: return
-        val desiredGravity = if (compactLandscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
-        val desiredMarginStart = if (compactLandscape) dp(sideInset.roundToInt()) else 0
+        column.gravity = if (landscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
+        val pinToStart = compactLandscape
+        val desiredGravity = if (pinToStart) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
+        val desiredMarginStart = when {
+            compactLandscape -> dp(sideInset.roundToInt())
+            else -> 0
+        }
         if (lp.width != maxWidth || lp.gravity != desiredGravity || lp.marginStart != desiredMarginStart) {
             lp.width = maxWidth
             lp.gravity = desiredGravity
@@ -427,7 +994,7 @@ class NowPlayingScreen @JvmOverloads constructor(
             column.layoutParams = lp
         }
         val details = column.getChildAt(1) as? LinearLayout ?: return
-        details.translationY = if (idleClockMode) 0f else dp(if (landscape) -24 else 0).toFloat()
+        details.translationY = if (idleClockMode || shortLandscape) 0f else dp(if (landscape) -24 else 0).toFloat()
         (details.layoutParams as LinearLayout.LayoutParams).apply { width = if (landscape) 0 else LayoutParams.MATCH_PARENT; height = LayoutParams.WRAP_CONTENT; weight = if (landscape) 1f else 0f; marginStart = if (landscape) dp(44) else 0; details.layoutParams = this }
         details.orientation = if (bedsideLandscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
         details.gravity = if (landscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
@@ -443,9 +1010,9 @@ class NowPlayingScreen @JvmOverloads constructor(
             widgetsParams.height = LayoutParams.WRAP_CONTENT
             widgetsParams.weight = 0.36f
             widgetsParams.marginStart = dp(28)
-            widgets.textSize = 24f
+            widgets.textSize = if (shortLandscape) 18f else 20f
             widgets.maxLines = Int.MAX_VALUE
-            widgets.maxHeight = dp(180)
+            widgets.maxHeight = dp(if (shortLandscape) 96 else 180)
             widgets.gravity = Gravity.START or Gravity.CENTER_VERTICAL
         } else {
             clockParams.width = LayoutParams.MATCH_PARENT
@@ -456,19 +1023,52 @@ class NowPlayingScreen @JvmOverloads constructor(
             widgetsParams.height = LayoutParams.WRAP_CONTENT
             widgetsParams.weight = 0f
             widgetsParams.marginStart = 0
-            widgets.textSize = 22f
+            widgets.textSize = if (shortPortrait) 18f else 22f
             widgets.maxLines = Int.MAX_VALUE
             widgets.maxHeight = dp(240)
-            widgets.gravity = Gravity.START
+            widgets.gravity = Gravity.CENTER
         }
         clockView.layoutParams = clockParams
         widgets.layoutParams = widgetsParams
-        titleView.gravity = Gravity.START
-        artistView.gravity = Gravity.START
-        albumView.gravity = Gravity.START
-        details.gravity = Gravity.CENTER_VERTICAL or Gravity.START
-        volumeTrack.layoutParams = LinearLayout.LayoutParams(dp(58), dp(if (landscape) 250 else 168))
-        volumeSlider.layoutParams = FrameLayout.LayoutParams(dp(if (landscape) 250 else 168), dp(44), Gravity.CENTER)
+        titleView.gravity = if (landscape) Gravity.START else Gravity.CENTER
+        artistView.gravity = if (landscape) Gravity.START else Gravity.CENTER
+        albumView.gravity = if (landscape) Gravity.START else Gravity.CENTER
+        titleView.textAlignment = if (landscape) View.TEXT_ALIGNMENT_TEXT_START else View.TEXT_ALIGNMENT_CENTER
+        artistView.textAlignment = if (landscape) View.TEXT_ALIGNMENT_TEXT_START else View.TEXT_ALIGNMENT_CENTER
+        albumView.textAlignment = if (landscape) View.TEXT_ALIGNMENT_TEXT_START else View.TEXT_ALIGNMENT_CENTER
+        clockView.gravity = if (landscape) Gravity.START else Gravity.CENTER
+        widgets.textAlignment = if (landscape) View.TEXT_ALIGNMENT_TEXT_START else View.TEXT_ALIGNMENT_CENTER
+        details.gravity = if (landscape) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
+        val volumeLength = when { shortLandscape -> 150; landscape -> 250; else -> 168 }
+        if (landscape) {
+            volumeColumn.orientation = LinearLayout.VERTICAL
+            volumeColumn.gravity = Gravity.CENTER
+            volumeColumn.setPadding(dp(4), dp(8), dp(4), dp(8))
+            volumeCaption.layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(22))
+            volumeLabel.layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(22))
+            volumeTrack.layoutParams = LinearLayout.LayoutParams(dp(58), dp(volumeLength))
+            volumeSlider.rotation = -90f
+            volumeSlider.layoutParams = FrameLayout.LayoutParams(dp(volumeLength), dp(44), Gravity.CENTER)
+            val parent = volumeColumn.layoutParams as LayoutParams
+            parent.width = dp(80); parent.height = LayoutParams.WRAP_CONTENT
+            parent.gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            parent.marginEnd = dp(18); parent.bottomMargin = 0
+            volumeColumn.layoutParams = parent
+        } else {
+            volumeColumn.orientation = LinearLayout.HORIZONTAL
+            volumeColumn.gravity = Gravity.CENTER
+            volumeColumn.setPadding(dp(12), dp(4), dp(12), dp(4))
+            volumeCaption.layoutParams = LinearLayout.LayoutParams(dp(44), LayoutParams.MATCH_PARENT)
+            volumeLabel.layoutParams = LinearLayout.LayoutParams(dp(48), LayoutParams.MATCH_PARENT)
+            volumeTrack.layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+            volumeSlider.rotation = 0f
+            volumeSlider.layoutParams = FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(44), Gravity.CENTER)
+            val parent = volumeColumn.layoutParams as LayoutParams
+            parent.width = LayoutParams.MATCH_PARENT; parent.height = dp(64)
+            parent.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            parent.marginStart = dp(16); parent.marginEnd = dp(16); parent.bottomMargin = dp(16)
+            volumeColumn.layoutParams = parent
+        }
     }
 
     /** Reflects volume changes originating from either iOS or this screen without feeding back. */
@@ -508,7 +1108,7 @@ class NowPlayingScreen @JvmOverloads constructor(
                     animateBackdropTo(null)
                     // No artwork from the sender (typical for raw system audio) — show the AirPlay glyph.
                     artwork.scaleType = ImageView.ScaleType.CENTER_INSIDE
-                    val glyph = requireNotNull(context.getDrawable(R.drawable.ic_airplay)).mutate().apply {
+                    val glyph = requireNotNull(androidx.appcompat.content.res.AppCompatResources.getDrawable(context, R.drawable.ic_airplay)).mutate().apply {
                         setTint(color(R.color.text_secondary))
                     }
                     transitionArtwork(glyph)
@@ -589,10 +1189,10 @@ class NowPlayingScreen @JvmOverloads constructor(
                 val t = animator.animatedValue as Float
                 val a = android.animation.ArgbEvaluator().evaluate(t, fromStart, targetStart) as Int
                 val b = android.animation.ArgbEvaluator().evaluate(t, fromEnd, targetEnd) as Int
-                background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                    intArrayOf(a, b, blend(Color.rgb(8, 12, 22), b, 0.28f)))
-                backdropStart = a
-                backdropEnd = b
+                baseBackdropStart = a
+                baseBackdropEnd = b
+                if (ambientBackdropAnimator?.isStarted == true) applyAmbientBackdrop()
+                else renderBackdrop(a, b)
             }
             start()
         }
@@ -653,6 +1253,8 @@ class NowPlayingScreen @JvmOverloads constructor(
         (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        private const val INFO_TAB_WIDTH_DP = 92
+        private const val INFO_TAB_HEIGHT_DP = 44
         private const val WEATHER_RETRY_DELAY_MS = 10 * 60 * 1000L
         private const val ART_SIZE_DP = 360
         private const val VOLUME_SP = 16f
@@ -666,5 +1268,18 @@ class NowPlayingScreen @JvmOverloads constructor(
         setColor(Color.argb(76, 177, 196, 230))
         cornerRadius = dp(radiusDp).toFloat()
         setStroke(dp(1), Color.argb(70, 255, 255, 255))
+    }
+
+    private fun edgeFade(color: Int, left: Boolean) = GradientDrawable(
+        GradientDrawable.Orientation.LEFT_RIGHT,
+        if (left) intArrayOf(color, Color.TRANSPARENT) else intArrayOf(Color.TRANSPARENT, color)
+    )
+
+    private fun updatePageTabFades() {
+        if (!::pageTabsScroll.isInitialized || !::pageTabsLeftFade.isInitialized || !::pageTabsRightFade.isInitialized) return
+        val contentWidth = pageTabs.width + pageTabsScroll.paddingStart + pageTabsScroll.paddingEnd
+        val visibleRight = pageTabsScroll.scrollX + pageTabsScroll.width - pageTabsScroll.paddingEnd
+        pageTabsLeftFade.visibility = if (pageTabsScroll.scrollX > 0) View.VISIBLE else View.GONE
+        pageTabsRightFade.visibility = if (visibleRight < contentWidth) View.VISIBLE else View.GONE
     }
 }

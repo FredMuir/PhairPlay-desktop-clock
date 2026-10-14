@@ -2,10 +2,15 @@ package com.phairplay
 
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withId
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import android.widget.ScrollView
+import com.phairplay.R
+import com.phairplay.airplay.NowPlayingInfo
+import com.phairplay.ui.NowPlayingScreen
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,9 +59,10 @@ class MainActivityTest {
      * what to do.
      */
     @Test
-    fun mainActivity_showsWaitingScreenOnStart() {
-        onView(withId(R.id.waiting_container))
-            .check(matches(isDisplayed()))
+    fun mainActivity_showsHomeNavigationOnStart() {
+        activityRule.scenario.onActivity { activity ->
+            assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.nav_item_home).visibility)
+        }
     }
 
     /**
@@ -67,8 +73,59 @@ class MainActivityTest {
      */
     @Test
     fun mainActivity_streamingContainerHiddenOnStart() {
-        // The streaming container exists in the layout but has visibility GONE initially
-        onView(withId(R.id.streaming_container))
-            .check(matches(org.hamcrest.Matchers.not(isDisplayed())))
+        activityRule.scenario.onActivity { activity ->
+            assertEquals(View.GONE, activity.findViewById<View>(R.id.streaming_container).visibility)
+        }
+    }
+
+    @Test
+    fun nowPlayingOverlayShowsLongTrackMetadata() {
+        val title = "A deliberately long track title that should wrap instead of clipping on a narrow screen"
+        val info = NowPlayingInfo(
+            senderName = "UI layout check",
+            title = title,
+            artist = "Artist with a long name for layout validation",
+            album = "Album metadata that may wrap on compact portrait displays",
+        )
+        activityRule.scenario.onActivity { activity ->
+            val currentInfo = MainActivity::class.java.getDeclaredField("currentNowPlaying").apply {
+                isAccessible = true
+            }
+            currentInfo.set(activity, info)
+            activity.showNowPlayingScreen(info)
+
+            val container = activity.findViewById<ViewGroup>(R.id.streaming_container)
+            val screen = (0 until container.childCount)
+                .map { container.getChildAt(it) }
+                .filterIsInstance<NowPlayingScreen>()
+                .firstOrNull()
+            assertNotNull(screen)
+            assertEquals(View.VISIBLE, screen!!.visibility)
+
+            val titleView = findTextView(screen) { it.text.toString() == title }
+            assertNotNull(titleView)
+            assertEquals(View.VISIBLE, titleView!!.visibility)
+            assertNotNull(findScrollView(screen))
+        }
+    }
+
+    private fun findTextView(root: View, predicate: (TextView) -> Boolean): TextView? {
+        if (root is TextView && predicate(root)) return root
+        if (root is ViewGroup) {
+            for (index in 0 until root.childCount) {
+                findTextView(root.getChildAt(index), predicate)?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun findScrollView(root: View): ScrollView? {
+        if (root is ScrollView) return root
+        if (root is ViewGroup) {
+            for (index in 0 until root.childCount) {
+                findScrollView(root.getChildAt(index))?.let { return it }
+            }
+        }
+        return null
     }
 }

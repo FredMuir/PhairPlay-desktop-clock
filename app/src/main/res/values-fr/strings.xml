@@ -11,21 +11,35 @@
     <!-- ── Navigation ──────────────────────────────────────────── -->
     <string name="nav_home">Accueil</string>
     <string name="nav_settings">Paramètres</string>
+    <string name="nav_home_compact">Son</string>
+    <string name="nav_settings_compact">Régl.</string>
+    <string name="nav_devices_compact">App.</string>
+    <string name="nav_now_playing_compact">Heure</string>
 
     <!-- ── HomeFragment ────────────────────────────────────────── -->
-    <string name="home_title">Prêt pour les connexions</string>
+    <string name="home_title">Utiliser cet appareil comme récepteur AirPlay</string>
     <string name="home_device_visible_as">Visible sous le nom : %1$s</string>
+    <string name="speaker_section_title">État de réception AirPlay</string>
+    <string name="speaker_room_hint">La lecture multiroom se règle depuis l’émetteur. Sélectionnez d’autres enceintes AirPlay dans la liste AirPlay de l’appareil Apple.</string>
+    <string name="speaker_howto_title">Se connecter à AirPlay</string>
+    <string name="speaker_howto_body">Cet appareil et l’appareil Apple doivent être connectés au même réseau Wi‑Fi. Ouvrez la sortie audio AirPlay et sélectionnez le nom de cet appareil.</string>
+    <string name="protocol_miracast">Miracast (expérimental)</string>
+    <string name="protocol_cast">Google Cast (expérimental)</string>
 
     <!-- ── Protocol states ─────────────────────────────────────── -->
     <string name="protocol_state_disabled">Désactivé</string>
     <string name="protocol_state_advertising">En attente…</string>
     <string name="protocol_state_connected">Connecté</string>
     <string name="protocol_state_error">Erreur</string>
+    <string name="protocol_detail_disabled">Activez ce mode de réception dans les paramètres</string>
+    <string name="protocol_detail_waiting">Récepteur démarré, en attente d’une connexion</string>
+    <string name="protocol_detail_connected">Connecté à %1$s</string>
+    <string name="protocol_detail_error">Vérifiez le réseau et la compatibilité de l’appareil</string>
 
     <!-- ── Control buttons ─────────────────────────────────────── -->
-    <string name="action_start">Démarrer</string>
+    <string name="action_start">Démarrer le service</string>
     <string name="action_stop">Arrêter</string>
-    <string name="action_restart">Redémarrer</string>
+    <string name="action_restart">Redémarrer le service</string>
 
     <!-- ── Settings section headers ────────────────────────────── -->
     <string name="settings_section_display">Affichage</string>
@@ -36,8 +50,18 @@
     <!-- ── Settings row labels ─────────────────────────────────── -->
     <string name="setting_display_name">Nom de l\'appareil</string>
     <string name="setting_airplay_enabled">Récepteur AirPlay</string>
-    <string name="setting_miracast_enabled">Récepteur Miracast</string>
-    <string name="setting_cast_enabled">Récepteur Google Cast</string>
+    <string name="setting_miracast_enabled">Récepteur Miracast (expérimental)</string>
+    <string name="setting_miracast_subtitle">La découverte et la connexion sont en développement ; la lecture multimédia n’est pas terminée. La réception peut ne pas fonctionner sur certains appareils.</string>
+    <string name="setting_cast_enabled">Récepteur Google Cast (expérimental)</string>
+    <string name="setting_cast_subtitle">La lecture multimédia est en développement ; les tests complets nécessitent les services Google Play et un identifiant d’application Cast configuré.</string>
+    <string name="setting_start_on_boot_subtitle">Démarrer automatiquement le service de réception au démarrage de l’appareil</string>
+    <string name="setting_version">Version actuelle</string>
+    <string name="setting_version_value">%1$s (build %2$d)</string>
+    <string name="setting_version_details">GitHub · mises à jour et informations du projet</string>
+    <string name="setting_version_link_unavailable">Impossible d’ouvrir le lien GitHub</string>
+    <string name="setting_widget_clock_subtitle">Afficher l’heure actuelle sur l’écran de lecture</string>
+    <string name="setting_widget_date_subtitle">Afficher la date locale à côté de l’heure</string>
+    <string name="setting_widget_weather_subtitle">Connexion Internet requise ; indiquez une ville ci-dessous</string>
     <string name="setting_reset_defaults">Réinitialiser les paramètres</string>
     <string name="setting_reset_defaults_message">Tous les paramètres, y compris le mode de l’appareil, l’affichage du volume et l’horloge de chevet, seront réinitialisés. Cette action est irréversible.</string>
     <string name="setting_reset_confirm">Réinitialiser</string>

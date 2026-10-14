@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -120,6 +121,7 @@ class PhairPlayService : Service() {
 
     // Receiver instances — null when not running
     private var airPlayReceiver: AirPlayReceiver? = null
+    @Volatile private var airPlayRemoteControlsEnabled = false
 
     // Watches for the network coming back so mDNS can be re-registered — see
     // [registerNetworkCallback]. Null when never registered or already unregistered.
@@ -140,6 +142,13 @@ class PhairPlayService : Service() {
         else @Suppress("DEPRECATION") registerReceiver(mediaVolumeReceiver, volumeFilter)
         mediaVolumeReceiverRegistered = true
         settingsRepository = SettingsRepository(applicationContext)
+        serviceScope.launch {
+            settingsRepository.settingsFlow.collectLatest { settings ->
+                airPlayRemoteControlsEnabled = settings.airPlayRemoteControlsEnabled
+                airPlayReceiver?.setRemoteControlsEnabled(settings.airPlayRemoteControlsEnabled)
+                airPlayReceiver?.setLegacyDacpControlEnabled(settings.legacyDacpControlEnabled)
+            }
+        }
         createNotificationChannel()
         registerNetworkCallback()
         publishSystemMediaVolume()
@@ -246,6 +255,7 @@ class PhairPlayService : Service() {
      * sender has advertised a DACP identity.
      */
     fun sendAirPlayRemoteCommand(command: String) {
+        if (!airPlayRemoteControlsEnabled) return
         airPlayReceiver?.sendRemoteCommand(command)
     }
 
@@ -258,7 +268,7 @@ class PhairPlayService : Service() {
 
     private fun applySystemMediaVolumeDb(volumeDb: Float) {
         val audio = getSystemService(AudioManager::class.java)
-        val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        val min = mediaStreamMinVolume(audio)
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(min + 1)
         val span = max - min
         // AirPlay reserves -144 dB for mute; every other value, including its -30 dB
@@ -277,7 +287,7 @@ class PhairPlayService : Service() {
     /** Refreshes the card value after the user changes media volume with hardware/system controls. */
     fun publishSystemMediaVolume() {
         val audio = getSystemService(AudioManager::class.java)
-        val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+        val min = mediaStreamMinVolume(audio)
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(min + 1)
         val index = audio.getStreamVolume(AudioManager.STREAM_MUSIC).coerceIn(min, max)
         val volumeDb = if (index <= min) -144f else {
@@ -296,6 +306,10 @@ class PhairPlayService : Service() {
 
     private fun airPlayFractionToVolume(fraction: Float): Float =
         if (fraction <= 0f) -144f else -30f + fraction.coerceIn(0f, 1f) * 30f
+
+    /** The system minimum stream volume API was added in API 28; before that it is zero. */
+    private fun mediaStreamMinVolume(audio: AudioManager): Int =
+        if (android.os.Build.VERSION.SDK_INT >= 28) audio.getStreamMinVolume(AudioManager.STREAM_MUSIC) else 0
 
     override fun onDestroy() {
         Logger.i("PhairPlayService destroying")
@@ -430,6 +444,8 @@ class PhairPlayService : Service() {
             },
             onRemoteControlCommandsChanged = { commands -> _remoteControlCommands.value = commands },
             onRemotePlaybackChanged = { playing -> _remotePlaybackActive.value = playing },
+            legacyDacpControlEnabled = settings.legacyDacpControlEnabled,
+            airPlayRemoteControlsEnabled = settings.airPlayRemoteControlsEnabled,
             onStateChanged = { state ->
                 _airPlayState.value = state
                 when (state) {

@@ -3,6 +3,7 @@ package com.phairplay.ui
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import com.phairplay.util.Logger
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -13,6 +14,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.fragment.app.Fragment
 import com.phairplay.R
 
@@ -58,12 +60,15 @@ class DevicesFragment : Fragment() {
             minWidth = dp(112)
             setPadding(dp(20), 0, dp(20), 0)
             setTextColor(requireContext().getColor(R.color.background_dark))
-            background = requireContext().getDrawable(R.drawable.btn_devices_refresh_selector)
+            background = AppCompatResources.getDrawable(requireContext(), R.drawable.btn_devices_refresh_selector)
             setOnClickListener { refreshDiscovery() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(46)).apply {
             bottomMargin = dp(12)
         })
-        val scroll = ScrollView(requireContext())
+        val scroll = ScrollView(requireContext()).apply {
+            isVerticalFadingEdgeEnabled = true
+            setFadingEdgeLength(dp(18))
+        }
         content = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -88,11 +93,16 @@ class DevicesFragment : Fragment() {
         resolvingName = null
         showEmpty(getString(R.string.devices_scanning))
         val callback = object : NsdManager.DiscoveryListener {
-            override fun onDiscoveryStarted(serviceType: String) { scanning = true }
+            override fun onDiscoveryStarted(serviceType: String) {
+                scanning = true
+                Logger.i("LAN AirPlay discovery started for $serviceType")
+            }
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+                Logger.d("LAN AirPlay discovery found ${serviceInfo.serviceName} (${serviceInfo.serviceType})")
                 if (serviceInfo.serviceType?.contains("_airplay._tcp") == true) queueResolve(serviceInfo)
             }
             override fun onServiceLost(serviceInfo: NsdServiceInfo) {
+                Logger.d("LAN AirPlay discovery lost ${serviceInfo.serviceName}")
                 activity?.runOnUiThread {
                     devices.remove(serviceInfo.serviceName)
                     renderDevices()
@@ -109,6 +119,7 @@ class DevicesFragment : Fragment() {
                 }
             }
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+                Logger.w("LAN AirPlay discovery failed for $serviceType: $errorCode")
                 activity?.runOnUiThread {
                     scanning = false
                     showEmpty(getString(R.string.devices_scan_error, errorCode))
@@ -121,6 +132,7 @@ class DevicesFragment : Fragment() {
                     }
             }
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
+                Logger.w("LAN AirPlay discovery stop failed for $serviceType: $errorCode")
                 // Keep the active listener reference so a user can retry stopping it.
                 refreshPending = false
                 stopPending = false
@@ -178,10 +190,12 @@ class DevicesFragment : Fragment() {
         resolvingName = name
         nsd.resolveService(info, object : NsdManager.ResolveListener {
             override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+                Logger.w("LAN AirPlay resolve failed for ${serviceInfo.serviceName}: $errorCode")
                 resolvingName = null
                 resolveNext()
             }
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                Logger.i("LAN AirPlay resolved ${serviceInfo.serviceName} at ${serviceInfo.host?.hostAddress}:${serviceInfo.port}")
                 resolvingName = null
                 activity?.runOnUiThread {
                     if (isAdded) {
@@ -211,22 +225,23 @@ class DevicesFragment : Fragment() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(18), dp(12), dp(18), dp(12))
+                minimumHeight = dp(76)
                 setBackgroundResource(R.drawable.focus_ring_selector)
                 isFocusable = true
                 setOnClickListener { showDetails(info, rawModel, ip) }
             }
             card.addView(TextView(requireContext()).apply {
-                text = displayName(info) + if (isFavorite(info)) "  ★" else ""
+                text = if (isFavorite(info)) getString(R.string.devices_favorite_name, displayName(info)) else displayName(info)
                 textSize = 18f
                 setTextColor(requireContext().getColor(R.color.text_primary))
             })
             card.addView(TextView(requireContext()).apply {
-                text = "$model   ·   $ip:${info.port}"
+                text = getString(R.string.devices_endpoint, model, ip, info.port)
                 textSize = 14f
                 setTextColor(requireContext().getColor(R.color.text_secondary))
                 setPadding(0, dp(4), 0, 0)
             })
-            content.addView(card, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76)).apply { bottomMargin = dp(8) })
+            content.addView(card, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) })
         }
     }
 

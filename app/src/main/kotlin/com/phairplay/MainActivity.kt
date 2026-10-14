@@ -16,8 +16,10 @@ import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
@@ -224,6 +226,31 @@ class MainActivity : AppCompatActivity() {
                 it.setPaddingRelative(compactPadding, verticalPadding, compactPadding, it.paddingBottom)
             }
         }
+        if (widthDp < 600) {
+            navItemHome.text = getString(R.string.nav_home_compact)
+            navItemHome.contentDescription = getString(R.string.nav_home)
+            navItemSettings.text = getString(R.string.nav_settings_compact)
+            navItemSettings.contentDescription = getString(R.string.nav_settings)
+            navItemDevices.text = getString(R.string.nav_devices_compact)
+            navItemDevices.contentDescription = getString(R.string.nav_devices)
+            navItemNowPlaying.text = getString(R.string.nav_now_playing_compact)
+            navItemNowPlaying.contentDescription = getString(R.string.nav_now_playing)
+        }
+        if (widthDp < 360) {
+            val navPanel = findViewById<LinearLayout>(R.id.nav_panel)
+            val panelParams = navPanel.layoutParams as ViewGroup.MarginLayoutParams
+            val outerMargin = (8 * resources.displayMetrics.density).toInt()
+            panelParams.marginStart = outerMargin
+            panelParams.marginEnd = outerMargin
+            navPanel.layoutParams = panelParams
+
+            val panelPadding = (4 * resources.displayMetrics.density).toInt()
+            navPanel.setPaddingRelative(panelPadding, navPanel.paddingTop, panelPadding, navPanel.paddingBottom)
+            val itemPadding = (4 * resources.displayMetrics.density).toInt()
+            listOf(navItemHome, navItemSettings, navItemDevices, navItemNowPlaying).forEach {
+                it.setPaddingRelative(itemPadding, it.paddingTop, itemPadding, it.paddingBottom)
+            }
+        }
     }
 
     /**
@@ -237,6 +264,7 @@ class MainActivity : AppCompatActivity() {
         nowPlayingScreen.setVolumeChangeHandler { volumeDb ->
             service?.setAirPlayOutputVolumeDb(volumeDb)
         }
+        nowPlayingScreen.setRemoteCommandHandler { command -> service?.sendAirPlayRemoteCommand(command) }
         nowPlayingScreen.setReturnToAppHandler { dismissNowPlayingCard() }
         pinScreen = PinScreen(this)
         streamingContainer.addView(streamingScreen)
@@ -612,9 +640,15 @@ class MainActivity : AppCompatActivity() {
             com.phairplay.settings.SettingsRepository(this@MainActivity).settingsFlow.collectLatest { settings ->
                 audioScreenOffEnabled = settings.audioScreenOffEnabled
                 audioScreenOffTimeoutMinutes = settings.audioScreenOffTimeoutMinutes.coerceIn(1, 30)
+                nowPlayingScreen.setRemoteControlsEnabled(settings.airPlayRemoteControlsEnabled)
                 nowPlayingScreen.setWidgetSettings(settings.nowPlayingClockEnabled, settings.nowPlayingDateEnabled,
                     settings.nowPlayingAgendaEnabled, settings.nowPlayingWeatherEnabled, settings.weatherCity,
                     settings.nowPlayingWidgetStyle, settings.bedsideClockShowSeconds)
+                nowPlayingScreen.setHomeAssistantSettings(settings.homeAssistantEnabled, settings.homeAssistantUrl,
+                    settings.homeAssistantEntities, settings.homeAssistantCalendarEnabled, settings.homeAssistantCalendars,
+                    settings.homeAssistantTodoEnabled, settings.homeAssistantTodos)
+                nowPlayingScreen.setICloudSettings(settings.iCloudCalendarEnabled, settings.iCloudEmail, settings.iCloudCalendarHrefs)
+                nowPlayingScreen.setClockInfoSettings(settings.clockBatteryEnabled, settings.clockNextAlarmEnabled)
                 bedsideKeepScreenOn = settings.bedsideClockKeepScreenOn
                 bedsideDimScreen = settings.bedsideClockDimScreen
                 if (bedsideClockRequested) {
@@ -629,6 +663,12 @@ class MainActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             svc.outputVolumeDb.collectLatest { volumeDb -> nowPlayingScreen.setVolumeDb(volumeDb) }
+        }
+        lifecycleScope.launch {
+            svc.remoteControlAvailable.collectLatest { available -> nowPlayingScreen.setRemoteControlsAvailable(available) }
+        }
+        lifecycleScope.launch {
+            svc.remotePlaybackActive.collectLatest { playing -> nowPlayingScreen.setRemotePlaybackActive(playing) }
         }
         lifecycleScope.launch {
             svc.pairingPin.collectLatest { pin ->

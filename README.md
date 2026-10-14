@@ -20,13 +20,13 @@
 
 ## Project Status / 项目状态
 
-**EN:** The latest source on this fork's branch is **1.0.42** (`versionCode` 45). A local **1.0.43** development candidate (`versionCode` 46) is being prepared and is not part of this branch yet. This public repository is an independent development fork, not the original project's release channel; development is not intended to merge back into the original project. Check this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) for packages; source builds may include changes that are not in a release.
+**EN:** The current development version is **1.0.85** (`versionCode` 88), available as a universal debug build for device validation. This public repository is an independent development fork, not the original project's release channel. Check this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) for published packages and prereleases.
 
-**中文：** 当前 fork 分支中的最新源码为 **1.0.42**（`versionCode` 45）。本地正在准备 **1.0.43** 开发候选版（`versionCode` 46），尚未合入此分支。这是独立开发的公开 fork，不是原始项目的发布渠道；开发成果也不计划合并回原始项目。可在本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)查看安装包；源码中的功能可能尚未包含在正式发布包里。
+**中文：** 当前开发版本为 **1.0.85**（`versionCode` 88），提供用于设备验证的通用调试包。本公开仓库是独立开发 fork，不是原始项目的发布渠道。发布版和预发布版见本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)。
 
-**EN:** The main goal is to support more Android devices without regressing the established tablet and TV experience. Current build variants target Google/Android TV (Android 10+) and Fire TV (Android 7.1+). Phone and tablet adaptation is in progress; a device is not considered supported until it has been validated. Playback, mDNS discovery, screen sizing, remote controls, and audio synchronization can vary by Android version and manufacturer. See [docs/TESTING.md](docs/TESTING.md) for validation scope.
+**EN:** One universal APK targets compatible Android phones, tablets, Google/Android TV, and Fire TV. A device is not considered validated until tested; playback, mDNS discovery, screen sizing, remote controls, and audio synchronization can vary by Android version and manufacturer. See [docs/TESTING.md](docs/TESTING.md) for validation scope.
 
-**中文：** 项目的主要目标是在保持现有平板和电视体验的同时，支持更多 Android 设备。当前构建变体面向 Google/Android TV（Android 10+）和 Fire TV（Android 7.1+）。手机和平板适配仍在进行；设备只有经过验证后才会列为已验证设备。播放、mDNS 发现、界面尺寸、遥控器操作和音频同步可能因 Android 版本及厂商而异。验证范围见 [docs/TESTING.md](docs/TESTING.md)。
+**中文：** 项目使用一个通用 APK，适配兼容的 Android 手机、平板、Google/Android TV 和 Fire TV。设备只有经过实测后才会列为已验证设备；播放、mDNS 发现、界面尺寸、遥控器操作和音频同步可能因 Android 版本及厂商而异。验证范围见 [docs/TESTING.md](docs/TESTING.md)。
 
 **EN:** The AirPlay 2 implementation includes mDNS advertising, RTSP/HomeKit pairing, FairPlay key decryption, H.264 mirroring, AAC-ELD/AAC-LC/ALAC audio, PTP timing for multi-room playback, artwork and metadata, and remote-control paths over MediaRemote and DACP. Actual support varies by device and sender.
 
@@ -39,6 +39,14 @@
 **EN:** For build guidance, validation boundaries, synchronization and UI lessons, and maintenance recommendations, see the [PhairPlay maintenance playbook](docs/MAINTENANCE_PLAYBOOK_ZH.md).
 
 **中文：** 构建指南、验证边界、同步与界面经验以及维护建议，见 [PhairPlay 维护手册](docs/MAINTENANCE_PLAYBOOK_ZH.md)。
+
+**EN:** The bilingual [development history, UI principles, integration research, and roadmap](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md) records current feature status and the 1.0.85 validation scope.
+
+**中文：** [中英双语开发历史、UI 原则、集成研究与路线图](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md)记录了当前功能状态及 1.0.85 的验证范围。
+
+**EN:** All Android debug and release artifacts in the shared workspace use the same signing identity. See the [workspace signing policy](../ANDROID_SIGNING_POLICY_ZH.md) before building or installing.
+
+**中文：** 共享工作区中的 Android 调试包与发布包统一使用同一签名身份。构建或安装前请阅读[工作区签名策略](../ANDROID_SIGNING_POLICY_ZH.md)。
 
 **EN:** Miracast and Google Cast receiver stacks are in progress (control plane implemented; media playback pending). UPnP/DLNA MediaRenderer is a planned option for Windows “Cast to Device,” VLC, and mobile UPnP controllers; see [ADR-004](docs/decisions/ADR-004-dlna-mediarenderer-roadmap.md).
 
@@ -126,14 +134,13 @@
 
 ### Option A: Release APK / 方式 A：下载发布版 APK
 
-**EN:** Visit this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) and download an APK for a listed target device. If there are no releases, build from source using Option B.
+**EN:** Visit this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) and download the single universal APK. If there are no releases, build from source using Option B.
 
-**中文：** 前往本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)，下载页面列出的目标设备安装包。如果目前没有发布版本，请按方式 B 从源码构建。
+**中文：** 前往本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)，下载唯一的通用 APK。如果目前没有发布版本，请按方式 B 从源码构建。
 
 | APK | Device / 设备 |
 |-----|--------|
-| `PhairPlay-vX.Y.Z-googletv.apk` | Google TV / Android TV (Android 10+) |
-| `PhairPlay-vX.Y.Z-firetv.apk` | Amazon Fire TV (Android 7.1+) |
+| `PhairPlay-vX.Y.Z.apk` | Compatible Android phones, tablets, Google/Android TV, and Fire TV / 兼容的 Android 手机、平板、Google/Android TV 和 Fire TV |
 
 **EN:** Install via ADB or a sideloading app such as Downloader on Fire TV.
 
@@ -150,19 +157,16 @@ git clone https://github.com/FredMuir/PhairPlay-desktop-clock.git
 cd PhairPlay-desktop-clock
 ```
 
-**EN:** Build the Google TV or Fire TV variant. The Google TV variant may also be used for development validation on compatible Android phones and tablets; this does not imply full device support.
+**EN:** Build the single universal package for compatible phones, tablets, Android TV, and Fire TV.
 
-**中文：** 构建 Google TV 或 Fire TV 变体。Google TV 变体也可用于兼容 Android 手机和平板上的开发验证，但这不代表所有设备都已获得完整支持。
+**中文：** 为兼容手机、平板、Android TV 和 Fire TV 构建同一个通用包。
 
 ```bash
-# Google TV / Android TV; also for compatible phone/tablet development validation
-./gradlew assembleGoogletvDebug
+# Universal Android package
+./gradlew :app:assembleDebug
 
-# Google TV with a registered Cast App ID
-./gradlew assembleGoogletvDebug -Pphairplay.castAppId=<APP_ID>
-
-# Fire TV
-./gradlew assembleFiretvDebug
+# With a registered Cast App ID
+./gradlew :app:assembleDebug -Pphairplay.castAppId=<APP_ID>
 ```
 
 **EN:** APKs are written under `app/build/outputs/apk/`. The repository's CI checks can be run with:
@@ -171,22 +175,17 @@ cd PhairPlay-desktop-clock
 
 ```bash
 ./gradlew :test-runner:test
-./gradlew :app:lintGoogletvDebug :app:lintFiretvDebug \
-  :app:assembleGoogletvDebug :app:assembleFiretvDebug
+./gradlew :app:lintDebug :app:assembleDebug
 ```
 
-**EN:** Connect the device over USB (or enable network ADB), confirm it appears in `adb devices`, then install the matching APK:
+**EN:** Connect the device over USB (or enable network ADB), confirm it appears in `adb devices`, then install the universal APK:
 
 **中文：** 通过 USB 连接设备（或启用网络 ADB），确认设备出现在 `adb devices` 列表中，然后安装对应 APK：
 
 ```bash
 adb devices
 
-# Google/Android TV, or a compatible Android phone/tablet for development validation
-adb install app/build/outputs/apk/googletv/debug/app-googletv-debug.apk
-
-# Fire TV
-adb install app/build/outputs/apk/firetv/debug/app-firetv-debug.apk
+adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ## Sideloading Guide / 侧载指南
@@ -201,7 +200,7 @@ adb install app/build/outputs/apk/firetv/debug/app-firetv-debug.apk
    **中文：** 在“设置 → 网络和互联网”中查找电视 IP 地址，然后运行：
    ```bash
    adb connect <TV-IP>
-   adb install app-googletv-debug.apk
+   adb install PhairPlay-vX.Y.Z.apk
    ```
 4. **EN:** Launch PhairPlay from the app list.
    **中文：** 从应用列表启动 PhairPlay。
@@ -216,7 +215,7 @@ adb install app/build/outputs/apk/firetv/debug/app-firetv-debug.apk
    **中文：** 在“设置 → 我的 Fire TV → 关于 → 网络”中查找 Fire TV 的 IP 地址，然后运行：
    ```bash
    adb connect <FireTV-IP>
-   adb install app-firetv-debug.apk
+   adb install PhairPlay-vX.Y.Z.apk
    ```
 4. **EN:** Launch PhairPlay from **Apps → Your Apps & Games**.
    **中文：** 从“应用 → 您的应用和游戏”启动 PhairPlay。

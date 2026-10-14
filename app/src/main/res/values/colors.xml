@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="launcher_icon_background">#FF10272A</color>
     <!-- ─── Backgrounds ─────────────────────────────────────── -->
     <!-- True black — best for OLED, minimal visual noise on TV -->
     <color name="background_dark">#FF0C1115</color>
@@ -17,9 +18,9 @@
     <color name="text_on_accent">#FFFFFFFF</color>
 
     <!-- ─── Accent (Google TV blue) ─────────────────────────── -->
-    <color name="accent_blue">#FF79E0C2</color>
-    <color name="accent_blue_pressed">#FF4BAE91</color>
-    <color name="focus_ring">#FF79E0C2</color>
+    <color name="accent_blue">#FF62B5A1</color>
+    <color name="accent_blue_pressed">#FF478C78</color>
+    <color name="focus_ring">#FF62B5A1</color>
 
     <!-- ─── Protocol status colors ──────────────────────────── -->
     <!-- Green: service running / connected -->
@@ -33,7 +34,7 @@
 
     <!-- ─── Protocol brand colors ────────────────────────────── -->
     <!-- AirPlay: Apple silver-blue -->
-    <color name="protocol_airplay">#FF79E0C2</color>
+    <color name="protocol_airplay">#FF62B5A1</color>
     <!-- Miracast: neutral teal -->
     <color name="protocol_miracast">#FF30D158</color>
     <!-- Cast: Google blue -->
@@ -41,6 +42,6 @@
 
     <!-- ─── Navigation ────────────────────────────────────────── -->
     <color name="nav_panel_background">#FF0C1115</color>
-    <color name="nav_item_selected">#FF79E0C2</color>
+    <color name="nav_item_selected">#FF62B5A1</color>
     <color name="nav_item_normal">#FF9AA9A8</color>
 </resources>

@@ -32,20 +32,19 @@ Google's Android TV receiver overview:
 Use either a Gradle property:
 
 ```bash
-./gradlew assembleGoogletvDebug -Pphairplay.castAppId=<APP_ID>
+./gradlew :app:assembleDebug -Pphairplay.castAppId=<APP_ID>
 ```
 
 or an environment variable:
 
 ```bash
-PHAIRPLAY_CAST_APP_ID=<APP_ID> ./gradlew assembleGoogletvDebug
+PHAIRPLAY_CAST_APP_ID=<APP_ID> ./gradlew :app:assembleDebug
 ```
 
-If no ID is supplied, the Google TV build still succeeds, but PhairPlay marks
+If no ID is supplied, the universal build still succeeds, but PhairPlay marks
 Cast as an error at runtime instead of pretending Cast is ready for testing.
-With a valid ID, the Google TV flavor starts the official Cast Connect SDK.
+With a valid ID, the Android build starts the official Cast Connect SDK where available.
 Media load/playback handling still requires hardware validation with matching
 Cast sender apps and DRM-free test media.
 
-Fire TV builds do not use Google Cast because Fire TV does not include Google
-Play Services.
+Devices without Google Play Services do not provide Google Cast support.

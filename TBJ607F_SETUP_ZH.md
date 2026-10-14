@@ -15,16 +15,16 @@ PhairPlay 是 Android 上的 AirPlay 音频接收端。本指南记录 Lenovo TB
 安装 Android Studio（包含 Android SDK）和项目要求的 JDK，然后在仓库根目录运行 Gradle Wrapper：
 
 ```powershell
-.\gradlew.bat :app:assembleGoogletvDebug
+.\gradlew.bat :app:assembleDebug
 ```
 
-APK 默认输出到：
+通用 APK 默认输出到：
 
 ```text
-app/build/outputs/apk/googletv/debug/app-googletv-debug.apk
+app/build/outputs/apk/debug/app-debug.apk
 ```
 
-具体包名和版本以当前构建配置为准。开发构建与发布签名包用途不同；不要共享签名密钥、密钥库、密码或设备专用调试证书。
+所有 Android 项目的调试包与正式包使用同一工作区密钥。请遵守[统一签名策略](../ANDROID_SIGNING_POLICY_ZH.md)，不要创建或切换其他密钥。
 
 ## 兼容性记录
 

@@ -8,12 +8,15 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.IBinder
 import android.view.LayoutInflater
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.phairplay.R
 import com.phairplay.service.PhairPlayService
@@ -49,7 +52,7 @@ class HomeFragment : Fragment() {
             service = (binder as? PhairPlayService.LocalBinder)?.getService()
             isBound = true
             Logger.d("HomeFragment: bound to PhairPlayService")
-            observeServiceState()
+            if (view != null) observeServiceState()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -75,10 +78,15 @@ class HomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        (view as? ScrollView)?.apply {
+            isVerticalFadingEdgeEnabled = true
+            setFadingEdgeLength((18 * resources.displayMetrics.density).toInt())
+        }
         bindViews(view)
         configureProtocolCards()
         configureButtons()
         showDeviceName()
+        if (service != null) observeServiceState()
     }
 
     override fun onStart() {
@@ -108,6 +116,23 @@ class HomeFragment : Fragment() {
         btnStart         = view.findViewById(R.id.btn_start)
         btnStop          = view.findViewById(R.id.btn_stop)
         btnRestart       = view.findViewById(R.id.btn_restart)
+
+        val configuration = resources.configuration
+        if (configuration.screenWidthDp < 360 || configuration.fontScale >= 1.25f) {
+            val identityRow = view.findViewById<LinearLayout>(R.id.home_identity_row)
+            val statusChip = view.findViewById<LinearLayout>(R.id.home_service_status_chip)
+            identityRow.orientation = LinearLayout.VERTICAL
+            identityRow.gravity = Gravity.START
+            (textDeviceName.layoutParams as LinearLayout.LayoutParams).apply {
+                width = ViewGroup.LayoutParams.MATCH_PARENT
+                weight = 0f
+                textDeviceName.layoutParams = this
+            }
+            (statusChip.layoutParams as LinearLayout.LayoutParams).apply {
+                topMargin = (6 * resources.displayMetrics.density).toInt()
+                statusChip.layoutParams = this
+            }
+        }
     }
 
     /**
@@ -162,17 +187,19 @@ class HomeFragment : Fragment() {
      */
     private fun observeServiceState() {
         val svc = service ?: return
+        val owner = viewLifecycleOwnerLiveData.value ?: return
+        if (owner.lifecycle.currentState == Lifecycle.State.DESTROYED) return
 
-        viewLifecycleOwner.lifecycleScope.launch {
+        owner.lifecycleScope.launch {
             svc.serviceState.collectLatest { state -> updateServiceStateBadge(state) }
         }
-        viewLifecycleOwner.lifecycleScope.launch {
+        owner.lifecycleScope.launch {
             svc.airPlayState.collectLatest { state -> updateProtocolCard(cardAirPlay, state) }
         }
-        viewLifecycleOwner.lifecycleScope.launch {
+        owner.lifecycleScope.launch {
             svc.miracastState.collectLatest { state -> updateProtocolCard(cardMiracast, state) }
         }
-        viewLifecycleOwner.lifecycleScope.launch {
+        owner.lifecycleScope.launch {
             svc.castState.collectLatest { state -> updateProtocolCard(cardCast, state) }
         }
     }

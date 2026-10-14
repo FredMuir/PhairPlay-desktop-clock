@@ -2,7 +2,9 @@ package com.phairplay.ui
 
 import android.app.AlertDialog
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import com.phairplay.service.ServiceController
 import android.text.InputFilter
@@ -14,6 +16,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.ScrollView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.SwitchCompat
@@ -25,9 +28,14 @@ import com.phairplay.R
 import com.phairplay.settings.AppSettings
 import com.phairplay.settings.AirPlayDeviceMode
 import com.phairplay.settings.SettingsRepository
+import com.phairplay.integrations.HomeAssistant
+import com.phairplay.integrations.ICloudCalDav
+import com.phairplay.integrations.ICloudCalendar
 import com.phairplay.util.Logger
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+private const val GITHUB_RELEASES_URL = "https://github.com/FredMuir/PhairPlay-desktop-clock/releases"
 
 /**
  * SettingsFragment — Settings screen for PhairPlay.
@@ -76,6 +84,8 @@ class SettingsFragment : Fragment() {
     private lateinit var textAudioSyncValue: TextView
     private lateinit var textDeviceModeValue: TextView
     private lateinit var rowPinAuth: View
+    private lateinit var rowAirPlayRemoteControls: View
+    private lateinit var rowLegacyDacpControl: View
     private lateinit var rowStartOnBoot: View
     private lateinit var rowDebugOverlay: View
     private lateinit var rowForceHighRes: View
@@ -86,14 +96,25 @@ class SettingsFragment : Fragment() {
     private lateinit var rowWidgetWeather: View
     private lateinit var rowWidgetStyle: View
     private lateinit var rowWeatherCity: View
+    private lateinit var rowHaConfig: View
+    private lateinit var rowHaEntities: View
+    private lateinit var rowHaCalendar: View
+    private lateinit var rowHaTodo: View
+    private lateinit var textHaConfigValue: TextView
+    private lateinit var rowICloudConfig: View
+    private lateinit var rowICloudCalendar: View
+    private lateinit var textICloudConfigValue: TextView
     private lateinit var rowBedsideClockKeepOn: View
     private lateinit var rowBedsideClockDim: View
     private lateinit var rowBedsideClockSeconds: View
+    private lateinit var rowClockBattery: View
+    private lateinit var rowClockNextAlarm: View
     private lateinit var textWidgetStyleValue: TextView
     private lateinit var textWeatherCityValue: TextView
     private lateinit var rowAudioScreenTimeout: View
     private lateinit var textAudioScreenTimeoutValue: TextView
     private lateinit var textVersionValue: TextView
+    private lateinit var rowVersion: View
     private lateinit var rowReset: LinearLayout
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
@@ -101,6 +122,10 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        (view as? ScrollView)?.apply {
+            isVerticalFadingEdgeEnabled = true
+            setFadingEdgeLength((18 * resources.displayMetrics.density).toInt())
+        }
         settingsRepository = SettingsRepository(requireContext())
         bindViews(view)
         setSectionTitles()
@@ -132,6 +157,8 @@ class SettingsFragment : Fragment() {
         textAudioSyncValue  = view.findViewById(R.id.text_audio_sync_value)
         textDeviceModeValue = view.findViewById(R.id.text_device_mode_value)
         rowPinAuth          = view.findViewById(R.id.row_pin_auth)
+        rowAirPlayRemoteControls = view.findViewById(R.id.row_airplay_remote_controls)
+        rowLegacyDacpControl = view.findViewById(R.id.row_legacy_dacp_control)
         rowStartOnBoot      = view.findViewById(R.id.row_start_on_boot)
         rowDebugOverlay     = view.findViewById(R.id.row_debug_overlay)
         rowForceHighRes     = view.findViewById(R.id.row_force_high_res)
@@ -142,14 +169,25 @@ class SettingsFragment : Fragment() {
         rowWidgetWeather = view.findViewById(R.id.row_widget_weather)
         rowWidgetStyle = view.findViewById(R.id.row_widget_style)
         rowWeatherCity = view.findViewById(R.id.row_weather_city)
+        rowHaConfig = view.findViewById(R.id.row_ha_config)
+        rowHaEntities = view.findViewById(R.id.row_ha_entities)
+        rowHaCalendar = view.findViewById(R.id.row_ha_calendar)
+        rowHaTodo = view.findViewById(R.id.row_ha_todo)
+        textHaConfigValue = view.findViewById(R.id.text_ha_config_value)
+        rowICloudConfig = view.findViewById(R.id.row_icloud_config)
+        rowICloudCalendar = view.findViewById(R.id.row_icloud_calendar)
+        textICloudConfigValue = view.findViewById(R.id.text_icloud_config_value)
         rowBedsideClockKeepOn = view.findViewById(R.id.row_bedside_clock_keep_on)
         rowBedsideClockDim = view.findViewById(R.id.row_bedside_clock_dim)
         rowBedsideClockSeconds = view.findViewById(R.id.row_bedside_clock_seconds)
+        rowClockBattery = view.findViewById(R.id.row_clock_battery)
+        rowClockNextAlarm = view.findViewById(R.id.row_clock_next_alarm)
         textWidgetStyleValue = view.findViewById(R.id.text_widget_style_value)
         textWeatherCityValue = view.findViewById(R.id.text_weather_city_value)
         rowAudioScreenTimeout = view.findViewById(R.id.row_audio_screen_timeout)
         textAudioScreenTimeoutValue = view.findViewById(R.id.text_audio_screen_timeout_value)
         textVersionValue    = view.findViewById(R.id.text_version_value)
+        rowVersion          = view.findViewById(R.id.row_version)
         rowReset            = view.findViewById(R.id.row_reset)
     }
 
@@ -170,19 +208,34 @@ class SettingsFragment : Fragment() {
         configureToggleRow(rowCast,         R.string.setting_cast_enabled,       R.string.setting_cast_subtitle)
         configureToggleRow(rowMirrorAudio,  R.string.setting_mirror_audio,       R.string.setting_mirror_audio_subtitle)
         configureToggleRow(rowPinAuth,      R.string.setting_pin_auth,           R.string.setting_pin_auth_subtitle)
-        configureToggleRow(rowStartOnBoot,  R.string.setting_start_on_boot,      0)
+        configureToggleRow(rowAirPlayRemoteControls, R.string.setting_airplay_remote_controls, R.string.setting_airplay_remote_controls_subtitle)
+        configureToggleRow(rowLegacyDacpControl, R.string.setting_legacy_dacp_control, R.string.setting_legacy_dacp_control_subtitle)
+        configureToggleRow(rowStartOnBoot,  R.string.setting_start_on_boot,      R.string.setting_start_on_boot_subtitle)
         configureToggleRow(rowDebugOverlay, R.string.setting_debug_overlay,      R.string.setting_debug_overlay_subtitle)
         configureToggleRow(rowForceHighRes, R.string.setting_force_high_res,      R.string.setting_force_high_res_subtitle)
         configureToggleRow(rowAudioScreenOff, R.string.setting_audio_screen_off, R.string.setting_audio_screen_off_subtitle)
-        configureToggleRow(rowWidgetClock, R.string.setting_widget_clock, 0)
-        configureToggleRow(rowWidgetDate, R.string.setting_widget_date, 0)
+        configureToggleRow(rowWidgetClock, R.string.setting_widget_clock, R.string.setting_widget_clock_subtitle)
+        configureToggleRow(rowWidgetDate, R.string.setting_widget_date, R.string.setting_widget_date_subtitle)
         configureToggleRow(rowWidgetAgenda, R.string.setting_widget_agenda, R.string.setting_widget_agenda_subtitle)
-        configureToggleRow(rowWidgetWeather, R.string.setting_widget_weather, 0)
+        configureToggleRow(rowWidgetWeather, R.string.setting_widget_weather, R.string.setting_widget_weather_subtitle)
+        configureToggleRow(rowHaEntities, R.string.setting_ha_entities, R.string.setting_ha_entities_subtitle)
+        configureToggleRow(rowHaCalendar, R.string.setting_ha_calendar, R.string.setting_ha_calendar_subtitle)
+        configureToggleRow(rowHaTodo, R.string.setting_ha_todo, R.string.setting_ha_todo_subtitle)
+        configureToggleRow(rowICloudCalendar, R.string.setting_icloud_calendar, R.string.setting_icloud_calendar_subtitle)
         configureToggleRow(rowBedsideClockKeepOn, R.string.setting_bedside_keep_on, R.string.setting_bedside_keep_on_subtitle)
         configureToggleRow(rowBedsideClockDim, R.string.setting_bedside_dim, R.string.setting_bedside_dim_subtitle)
         configureToggleRow(rowBedsideClockSeconds, R.string.setting_bedside_seconds, R.string.setting_bedside_seconds_subtitle)
+        configureToggleRow(rowClockBattery, R.string.setting_clock_battery, R.string.setting_clock_battery_subtitle)
+        configureToggleRow(rowClockNextAlarm, R.string.setting_clock_next_alarm, R.string.setting_clock_next_alarm_subtitle)
 
-        textVersionValue.text = BuildConfig.VERSION_NAME
+        textVersionValue.text = getString(R.string.setting_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
+        rowVersion.setOnClickListener {
+            runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_RELEASES_URL)))
+            }.onFailure {
+                Toast.makeText(requireContext(), R.string.setting_version_link_unavailable, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     /**
@@ -228,6 +281,8 @@ class SettingsFragment : Fragment() {
         setToggle(rowMirrorAudio,  settings.mirrorAudioEnabled)
         textDeviceModeValue.text = getString(if (settings.deviceMode == AirPlayDeviceMode.HOMEPOD) R.string.device_mode_homepod else R.string.device_mode_apple_tv)
         setToggle(rowPinAuth,      settings.airPlayPinAuthEnabled)
+        setToggle(rowAirPlayRemoteControls, settings.airPlayRemoteControlsEnabled)
+        setToggle(rowLegacyDacpControl, settings.legacyDacpControlEnabled)
         setToggle(rowStartOnBoot,  settings.startOnBoot)
         setToggle(rowDebugOverlay, settings.showDebugOverlay)
         setToggle(rowForceHighRes, settings.forceHighResolution)
@@ -236,9 +291,17 @@ class SettingsFragment : Fragment() {
         setToggle(rowWidgetDate, settings.nowPlayingDateEnabled)
         setToggle(rowWidgetAgenda, settings.nowPlayingAgendaEnabled)
         setToggle(rowWidgetWeather, settings.nowPlayingWeatherEnabled)
+        setToggle(rowHaEntities, settings.homeAssistantEnabled)
+        setToggle(rowHaCalendar, settings.homeAssistantCalendarEnabled)
+        setToggle(rowHaTodo, settings.homeAssistantTodoEnabled)
+        textHaConfigValue.text = settings.homeAssistantUrl.ifBlank { getString(R.string.setting_ha_config_subtitle) }
+        setToggle(rowICloudCalendar, settings.iCloudCalendarEnabled)
+        textICloudConfigValue.text = settings.iCloudEmail.ifBlank { getString(R.string.setting_icloud_config_subtitle) }
         setToggle(rowBedsideClockKeepOn, settings.bedsideClockKeepScreenOn)
         setToggle(rowBedsideClockDim, settings.bedsideClockDimScreen)
         setToggle(rowBedsideClockSeconds, settings.bedsideClockShowSeconds)
+        setToggle(rowClockBattery, settings.clockBatteryEnabled)
+        setToggle(rowClockNextAlarm, settings.clockNextAlarmEnabled)
         textWidgetStyleValue.setText(if (settings.nowPlayingWidgetStyle == "CARD") R.string.setting_widget_style_card else R.string.setting_widget_style_minimal)
         textWeatherCityValue.text = settings.weatherCity.ifBlank { getString(R.string.setting_weather_not_set) }
         textAudioScreenTimeoutValue.text = getString(R.string.setting_audio_screen_timeout_value, settings.audioScreenOffTimeoutMinutes)
@@ -263,6 +326,8 @@ class SettingsFragment : Fragment() {
         rowDisplayName.setOnClickListener { showDisplayNameDialog() }
         rowWidgetStyle.setOnClickListener { showWidgetStyleDialog() }
         rowWeatherCity.setOnClickListener { showWeatherCityDialog() }
+        rowHaConfig.setOnClickListener { showHomeAssistantDialog() }
+        rowICloudConfig.setOnClickListener { showICloudDialog() }
         rowDeviceMode.setOnClickListener { showDeviceModeDialog() }
         rowAudioScreenTimeout.setOnClickListener { showAudioScreenTimeoutDialog() }
         seekAudioSync.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -284,6 +349,8 @@ class SettingsFragment : Fragment() {
         setToggleListener(rowCast)         { enabled -> save { it.copy(castEnabled = enabled) } }
         setToggleListener(rowMirrorAudio)  { enabled -> saveAndRestart { it.copy(mirrorAudioEnabled = enabled) } }
         setToggleListener(rowPinAuth)      { enabled -> saveAndRestart { it.copy(airPlayPinAuthEnabled = enabled) } }
+        setToggleListener(rowAirPlayRemoteControls) { enabled -> save { it.copy(airPlayRemoteControlsEnabled = enabled) } }
+        setToggleListener(rowLegacyDacpControl) { enabled -> save { it.copy(legacyDacpControlEnabled = enabled) } }
         setToggleListener(rowStartOnBoot)  { enabled -> save { it.copy(startOnBoot = enabled) } }
         setToggleListener(rowDebugOverlay) { enabled -> save { it.copy(showDebugOverlay = enabled) } }
         setToggleListener(rowForceHighRes) { enabled -> save { it.copy(forceHighResolution = enabled) } }
@@ -307,9 +374,15 @@ class SettingsFragment : Fragment() {
             }
         }
         setToggleListener(rowWidgetWeather) { enabled -> save { it.copy(nowPlayingWeatherEnabled = enabled) } }
+        setToggleListener(rowHaEntities) { enabled -> save { it.copy(homeAssistantEnabled = enabled) } }
+        setToggleListener(rowHaCalendar) { enabled -> save { it.copy(homeAssistantCalendarEnabled = enabled, homeAssistantEnabled = it.homeAssistantEnabled || enabled) } }
+        setToggleListener(rowHaTodo) { enabled -> save { it.copy(homeAssistantTodoEnabled = enabled, homeAssistantEnabled = it.homeAssistantEnabled || enabled) } }
+        setToggleListener(rowICloudCalendar) { enabled -> save { it.copy(iCloudCalendarEnabled = enabled) } }
         setToggleListener(rowBedsideClockKeepOn) { enabled -> save { it.copy(bedsideClockKeepScreenOn = enabled) } }
         setToggleListener(rowBedsideClockDim) { enabled -> save { it.copy(bedsideClockDimScreen = enabled) } }
         setToggleListener(rowBedsideClockSeconds) { enabled -> save { it.copy(bedsideClockShowSeconds = enabled) } }
+        setToggleListener(rowClockBattery) { enabled -> save { it.copy(clockBatteryEnabled = enabled) } }
+        setToggleListener(rowClockNextAlarm) { enabled -> save { it.copy(clockNextAlarmEnabled = enabled) } }
 
         rowReset.setOnClickListener { resetSettings() }
     }
@@ -329,6 +402,134 @@ class SettingsFragment : Fragment() {
         AlertDialog.Builder(requireContext()).setTitle(R.string.setting_weather_city).setView(input)
             .setPositiveButton(android.R.string.ok) { _, _ -> val city = input.text.toString().trim(); textWeatherCityValue.text = city.ifBlank { getString(R.string.setting_weather_not_set) }; save { it.copy(weatherCity = city) } }
             .setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun showHomeAssistantDialog() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val current = settingsRepository.settingsFlow.first()
+            val fields = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 8, 48, 0) }
+            fun field(hintRes: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT, lines: Int = 1) = EditText(requireContext()).apply {
+                hint = getString(hintRes); setText(value); inputType = type; minLines = lines; maxLines = lines
+            }
+            val url = field(R.string.setting_ha_url_hint, current.homeAssistantUrl, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+            val token = field(R.string.setting_ha_token_hint, "", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+            val entities = field(R.string.setting_ha_entities_hint, current.homeAssistantEntities, lines = 2)
+            val calendars = field(R.string.setting_ha_calendars_hint, current.homeAssistantCalendars, lines = 2)
+            val todos = field(R.string.setting_ha_todos_hint, current.homeAssistantTodos, lines = 2)
+            fields.addView(url); fields.addView(token); fields.addView(entities); fields.addView(calendars); fields.addView(todos)
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.setting_ha_config)
+                .setMessage(R.string.setting_ha_config_help)
+                .setView(fields)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    val address = url.text.toString().trim().trimEnd('/')
+                    val enteredToken = token.text.toString().trim()
+                    if (enteredToken.isNotEmpty()) HomeAssistant.saveToken(requireContext(), enteredToken)
+                    val hasToken = enteredToken.isNotEmpty() || HomeAssistant.token(requireContext()) != null
+                    textHaConfigValue.text = address.ifBlank { getString(R.string.setting_ha_config_subtitle) }
+                    save { it.copy(homeAssistantUrl = address, homeAssistantEntities = entities.text.toString(),
+                        homeAssistantCalendars = calendars.text.toString(), homeAssistantTodos = todos.text.toString(),
+                        homeAssistantEnabled = address.isNotBlank() && hasToken) }
+                    if (address.isNotBlank() && hasToken) {
+                        viewLifecycleOwner.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            val valid = runCatching { HomeAssistant.request(address, HomeAssistant.token(requireContext()).orEmpty(), "/api/") }.isSuccess
+                            launch(kotlinx.coroutines.Dispatchers.Main) {
+                                if (isAdded) Toast.makeText(requireContext(), if (valid) R.string.setting_ha_connected else R.string.setting_ha_connection_failed, Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }
+                .setNeutralButton(R.string.setting_ha_disconnect) { _, _ ->
+                    HomeAssistant.clearToken(requireContext())
+                    textHaConfigValue.text = getString(R.string.setting_ha_config_subtitle)
+                    save { it.copy(homeAssistantUrl = "", homeAssistantEnabled = false, homeAssistantCalendarEnabled = false, homeAssistantTodoEnabled = false) }
+                    setToggle(rowHaEntities, false); setToggle(rowHaCalendar, false); setToggle(rowHaTodo, false)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    private fun showICloudDialog() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val current = settingsRepository.settingsFlow.first()
+            val email = EditText(requireContext()).apply {
+                hint = getString(R.string.setting_icloud_email_hint)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                setText(current.iCloudEmail)
+            }
+            val appPassword = EditText(requireContext()).apply {
+                hint = getString(R.string.setting_icloud_password_hint)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
+            val fields = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(48, 8, 48, 0)
+                addView(email)
+                addView(appPassword)
+            }
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.setting_icloud_config)
+                .setMessage(R.string.setting_icloud_config_help)
+                .setView(fields)
+                .setPositiveButton(R.string.setting_icloud_sign_in) { _, _ ->
+                    val address = email.text.toString().trim()
+                    val enteredPassword = appPassword.text.toString().trim()
+                    val password = enteredPassword.ifBlank { ICloudCalDav.password(requireContext()).orEmpty() }
+                    if (address.isBlank() || password.isBlank()) {
+                        Toast.makeText(requireContext(), R.string.setting_icloud_credentials_required, Toast.LENGTH_LONG).show()
+                        return@setPositiveButton
+                    }
+                    viewLifecycleOwner.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val result = runCatching { ICloudCalDav.discoverCalendars(address, password) }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            if (!isAdded) return@withContext
+                            val calendars = result.getOrNull().orEmpty()
+                            if (calendars.isEmpty()) {
+                                Toast.makeText(requireContext(), if (result.isSuccess) R.string.setting_icloud_no_calendars else R.string.setting_icloud_connection_failed, Toast.LENGTH_LONG).show()
+                                return@withContext
+                            }
+                            showICloudCalendarPicker(address, enteredPassword, calendars, current.iCloudCalendarHrefs)
+                        }
+                    }
+                }
+                .setNeutralButton(R.string.setting_icloud_disconnect) { _, _ ->
+                    ICloudCalDav.clearPassword(requireContext())
+                    textICloudConfigValue.text = getString(R.string.setting_icloud_config_subtitle)
+                    setToggle(rowICloudCalendar, false)
+                    save { it.copy(iCloudEmail = "", iCloudCalendarHrefs = "", iCloudCalendarEnabled = false) }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    private fun showICloudCalendarPicker(email: String, enteredPassword: String, calendars: List<ICloudCalendar>, saved: String) {
+        val savedHrefs = runCatching {
+            val json = org.json.JSONArray(saved)
+            (0 until json.length()).mapNotNull { json.optJSONObject(it)?.optString("href") }
+        }.getOrDefault(emptyList())
+        val checked = BooleanArray(calendars.size) { calendars[it].href in savedHrefs }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.setting_icloud_choose_calendars)
+            .setMultiChoiceItems(calendars.map { it.name }.toTypedArray(), checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val selected = calendars.filterIndexed { index, _ -> checked[index] }
+                if (selected.isEmpty()) {
+                    Toast.makeText(requireContext(), R.string.setting_icloud_select_one, Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                val json = org.json.JSONArray().apply {
+                    selected.forEach { put(org.json.JSONObject().put("href", it.href).put("name", it.name)) }
+                }.toString()
+                if (enteredPassword.isNotBlank()) ICloudCalDav.savePassword(requireContext(), enteredPassword)
+                textICloudConfigValue.text = email
+                setToggle(rowICloudCalendar, true)
+                save { it.copy(iCloudEmail = email, iCloudCalendarHrefs = json, iCloudCalendarEnabled = true) }
+                Toast.makeText(requireContext(), R.string.setting_icloud_connected, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun showDeviceModeDialog() {
@@ -467,6 +668,8 @@ class SettingsFragment : Fragment() {
             .setPositiveButton(R.string.setting_reset_confirm) { _, _ ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     settingsRepository.resetToDefaults()
+                    HomeAssistant.clearToken(requireContext())
+                    ICloudCalDav.clearPassword(requireContext())
                     populateUI(AppSettings.DEFAULT)
                     Logger.i("Settings reset to defaults")
                 }

@@ -60,6 +60,12 @@ data class AppSettings(
      */
     val airPlayPinAuthEnabled: Boolean = false,
 
+    /** Allow legacy DACP reverse control as a compatibility fallback. Disabled by default. */
+    val legacyDacpControlEnabled: Boolean = false,
+
+    /** Show and send AirPlay sender transport controls. Disabled to protect default playback. */
+    val airPlayRemoteControlsEnabled: Boolean = false,
+
     // ─── Service behavior ──────────────────────────────────────────────────
     /**
      * Whether PhairPlayService starts automatically on device boot.
@@ -108,7 +114,19 @@ data class AppSettings(
     val weatherCity: String = "",
     val bedsideClockKeepScreenOn: Boolean = true,
     val bedsideClockDimScreen: Boolean = true,
-    val bedsideClockShowSeconds: Boolean = false
+    val bedsideClockShowSeconds: Boolean = false,
+    val clockBatteryEnabled: Boolean = false,
+    val clockNextAlarmEnabled: Boolean = false,
+    val homeAssistantUrl: String = "",
+    val homeAssistantEntities: String = "",
+    val homeAssistantCalendars: String = "",
+    val homeAssistantTodos: String = "",
+    val homeAssistantEnabled: Boolean = false,
+    val homeAssistantCalendarEnabled: Boolean = false,
+    val homeAssistantTodoEnabled: Boolean = false,
+    val iCloudEmail: String = "",
+    val iCloudCalendarHrefs: String = "",
+    val iCloudCalendarEnabled: Boolean = false
 ) {
 
     /** Advertised mirroring display size: 2560×1440 when [forceHighResolution], else 1920×1080. */

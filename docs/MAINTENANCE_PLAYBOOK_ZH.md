@@ -26,12 +26,18 @@
 优先使用仓库 Gradle Wrapper、项目指定的 JDK 和 Android SDK：
 
 ```powershell
-.\gradlew.bat :app:assembleGoogletvDebug
+.\gradlew.bat :app:assembleDebug
 ```
 
-APK 默认位于 `app/build/outputs/apk/googletv/debug/`。具体任务名以项目 Gradle 配置为准。发布构建应依照项目的签名配置进行，并在提交前确认密钥库、密码、签名属性和生成 APK 均未纳入版本控制。
+APK 默认位于 `app/build/outputs/apk/debug/app-debug.apk`。PhairPlay 只维护一个适配多种 Android 设备的包。
 
 Android 覆盖安装要求签名证书匹配；调试密钥只适用于本地开发，不应发布到仓库。验证签名时使用 Android SDK 中的 `apksigner`，不要公开设备专用的调试证书指纹。
+
+所有调试和正式包均遵循共享工作区策略：[ANDROID_SIGNING_POLICY_ZH.md](../../ANDROID_SIGNING_POLICY_ZH.md)。PhairPlay 的调试与发布变体都使用 `F:\AndroidDevData\connect\.codex-android-signing\android-unified.keystore`，禁止回退到各 Windows 用户目录下的默认调试密钥或旧版发布密钥。密钥不可用时停止签名，不生成替代密钥。
+
+每次实机安装前，先用 `adb shell pm path <applicationId>` 找到设备 APK，与候选 APK 分别运行 `apksigner verify --print-certs` 并确认签名相同。证书不同时停止；只有用户明确授权签名迁移后，才能卸载重装，并需预先说明 DataStore 设置、配对信息和设备身份可能丢失。私钥只留在 Git 仓库以外的受保护位置，禁止写入 Git、日志或对话。
+
+2026-10-14 现场记录：Lenovo TB-J607F 的 1.0.77 与统一密钥签名不同。用户授权卸载重装后，已安装 1.0.78（code 81），使用工作区统一密钥；该操作重置了应用本地设置，首次安装时间为 2026-10-14 01:59:39。后续调试与发布都必须继续使用统一密钥。
 
 ## 多房间音频同步
 

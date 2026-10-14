@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.85] - 2026-10-14
+
+> Universal debug prerelease for device validation / 面向设备验证的通用调试预发布版
+
+### Changed / 变更
+- Adapt clock and playback surfaces for phones and tablets while retaining TV navigation; improve playback page switching, bottom volume control, shared control styling, and launcher icon resources. / 适配手机和平板时钟与播放界面，同时保留电视导航；改进播放页切换、底部音量控制、控件视觉和启动器图标资源。
+- Add slow ambient background movement and album-art-derived color behavior. / 增加缓慢的环境背景移动和专辑图取色效果。
+- Add optional Home Assistant and direct read-only iCloud Calendar (CalDAV) integration paths. / 增加可选 Home Assistant 与只读 iCloud 日历（CalDAV）直连接入路径。
+- Improve AirPlay event-channel/DACP remote-control handling and service/synchronization behavior. / 改进 AirPlay 事件通道/DACP 反向控制处理及服务/同步行为。
+- Update English and Chinese UI copy, tests, and project documentation; mark unfinished receiver paths and real-account/device validation as experimental or pending. / 更新中英文界面文案、测试和项目文档；将未完成的接收路径和真实账号/设备验证标为实验或待验证。
+
+### Validation / 验证
+- Built and installed version 1.0.85 (`versionCode` 88) on Lenovo TB-J607F; checked receiver service, RTSP endpoint, and mDNS advertising. / 已构建并安装 1.0.85（`versionCode` 88）至 Lenovo TB-J607F；检查接收服务、RTSP 端点和 mDNS 广播。
+- Build completion does not imply complete AirPlay sender-control, iCloud account, playback, synchronization, or all-device UI validation. See [testing](docs/TESTING.md) and the [development roadmap](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md). / 构建完成不代表 AirPlay 发送端控制、iCloud 账号、播放、同步或所有设备界面均已完整验证。详见[测试说明](docs/TESTING.md)和[开发路线图](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md)。
+- Artifact: `PhairPlay-1.0.85-unified-debug.apk` (universal debug APK). / 安装包：`PhairPlay-1.0.85-unified-debug.apk`（通用调试 APK）。
+
 ### Fixed
 - Reduce AirPlay multi-room join lag by waiting for advancing `AudioTrack` timestamps before applying phase feedback, then skipping up to one second of already-late startup audio in a bounded phase correction. Small residual errors still use the existing servo.
 - Keep the PCM converter's rate clamp aligned with the temporary catch-up limit.

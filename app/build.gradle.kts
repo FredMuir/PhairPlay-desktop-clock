@@ -1,10 +1,6 @@
 // App module build configuration for PhairPlay.
 //
-// Two product flavors are defined from the start:
-//   - "googletv": targets Google TV / Android TV (minSdk 29)
-//   - "firetv":   targets Amazon Fire TV (minSdk 25)
-//
-// Shared code lives in src/main/. Flavor-specific overrides in src/googletv/ and src/firetv/.
+// One universal application package supports phones, tablets, Google TV, and Fire TV.
 
 plugins {
     alias(libs.plugins.android.application)
@@ -19,19 +15,29 @@ val castAppId: String =
         ?: providers.environmentVariable("PHAIRPLAY_CAST_APP_ID").orNull
         ?: "").trim()
 
+// One local, workspace-wide signing identity is shared by Android projects under connect/.
+// The keystore itself is outside Git. Override only through the documented environment variables.
+val sharedAndroidKeystore = file(
+    System.getenv("ANDROID_SHARED_KEYSTORE")
+        ?: rootProject.file("../.codex-android-signing/android-unified.keystore").absolutePath
+)
+val sharedAndroidStorePassword = System.getenv("ANDROID_SHARED_KEYSTORE_PASSWORD") ?: ""
+val sharedAndroidKeyAlias = System.getenv("ANDROID_SHARED_KEY_ALIAS") ?: "androiddebugkey"
+val sharedAndroidKeyPassword = System.getenv("ANDROID_SHARED_KEY_PASSWORD") ?: ""
+
 android {
     namespace = "com.phairplay"
     compileSdk = 35
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        // applicationId is overridden per flavor below
+        applicationId = "com.phairplay.desktopclock"
         minSdk = 25           // Lowest common denominator (Fire TV)
         targetSdk = 35
         // Keep versionCode monotonic for Android upgrades; bump versionName with each
         // user-visible device-validation build so installed APKs are easy to identify.
-        versionCode = 45
-        versionName = "1.0.42-tbj607f"
+        versionCode = 88
+        versionName = "1.0.85"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "CAST_APP_ID", "\"${castAppId.escapedForBuildConfig()}\"")
@@ -52,42 +58,19 @@ android {
         }
     }
 
-    // Two flavors: one for Google TV, one for Amazon Fire TV.
-    // This separation allows flavor-specific code, resources, and dependencies.
-    flavorDimensions += "platform"
-    productFlavors {
-        create("googletv") {
-            dimension = "platform"
-            applicationId = "cn.codex.tbj607f.airplay"
-            minSdk = 29        // Google TV requires Android 10+
-            versionNameSuffix = "-googletv"
-        }
-        create("firetv") {
-            dimension = "platform"
-            applicationId = "com.phairplay.firetv"
-            minSdk = 25        // Fire TV supports Android 7.1+
-            versionNameSuffix = "-firetv"
-        }
-    }
-
-    // Release signing: credentials are injected via environment variables in CI.
-    // Set KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD to enable.
-    // Local builds without these vars produce unsigned release APKs (fine for dev/test).
-    val keystorePath = System.getenv("KEYSTORE_PATH")
-    if (keystorePath != null) {
-        signingConfigs {
-            create("release") {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
-            }
+    signingConfigs {
+        create("sharedAndroid") {
+            storeFile = sharedAndroidKeystore
+            storePassword = sharedAndroidStorePassword
+            keyAlias = sharedAndroidKeyAlias
+            keyPassword = sharedAndroidKeyPassword
         }
     }
 
     buildTypes {
         debug {
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("sharedAndroid")
         }
         release {
             isMinifyEnabled = true
@@ -96,7 +79,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = signingConfigs.getByName("sharedAndroid")
         }
     }
 
@@ -118,14 +101,6 @@ android {
         getByName("main") {
             kotlin.srcDirs("src/main/kotlin")
             res.srcDirs("src/main/res")
-        }
-        getByName("googletv") {
-            kotlin.srcDirs("src/googletv/kotlin")
-            res.srcDirs("src/googletv/res")
-        }
-        getByName("firetv") {
-            kotlin.srcDirs("src/firetv/kotlin")
-            res.srcDirs("src/firetv/res")
         }
         getByName("test") {
             kotlin.srcDirs("src/test/kotlin")
@@ -221,9 +196,12 @@ dependencies {
     // Binary property lists — AirPlay 2 handshake payloads (GET /info, SETUP)
     implementation(libs.ddplist)
 
-    // Google TV Cast Connect receiver SDK. Kept out of the Fire TV flavor because
-    // Fire TV lacks Google Play Services and cannot run Google Cast receiver APIs.
-    "googletvImplementation"(libs.play.services.cast.tv)
+    // Cast is enabled only when Google Play Services is available at runtime. On
+    // Fire TV the receiver reports unavailable while AirPlay/Miracast remain usable.
+    implementation(libs.play.services.cast.tv)
+
+    // CalDAV uses WebDAV PROPFIND/REPORT methods that HttpURLConnection does not support.
+    implementation(libs.okhttp)
 
     // Unit Testing
     testImplementation(libs.junit)

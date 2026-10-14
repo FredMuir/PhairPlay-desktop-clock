@@ -10,22 +10,32 @@
     <!-- ── Navigation ──────────────────────────────────────────── -->
     <string name="nav_home">Startseite</string>
     <string name="nav_settings">Einstellungen</string>
+    <string name="nav_home_compact">Start</string>
+    <string name="nav_settings_compact">Einst.</string>
+    <string name="nav_devices_compact">Geräte</string>
+    <string name="nav_now_playing_compact">Uhr</string>
 
     <!-- ── HomeFragment ────────────────────────────────────────── -->
-    <string name="home_title">Bereit für Verbindungen</string>
+    <string name="home_title">Dieses Gerät als AirPlay-Empfänger nutzen</string>
     <string name="home_device_visible_as">Sichtbar als: %1$s</string>
+    <string name="speaker_section_title">AirPlay-Empfangsstatus</string>
+    <string name="speaker_room_hint">Multiroom-Wiedergabe wird auf dem Sender eingerichtet. Wähle dazu weitere AirPlay-Lautsprecher in der AirPlay-Liste des Apple-Geräts aus.</string>
+    <string name="speaker_howto_title">AirPlay verbinden</string>
+    <string name="speaker_howto_body">Dieses Gerät und das Apple-Gerät müssen mit demselben WLAN verbunden sein. Öffne die AirPlay-Audioausgabe und wähle den Namen dieses Geräts aus.</string>
+    <string name="protocol_miracast">Miracast (experimentell)</string>
+    <string name="protocol_cast">Google Cast (experimentell)</string>
 
     <!-- ── Protocol states ─────────────────────────────────────── -->
     <string name="protocol_state_disabled">Deaktiviert</string>
-    <string name="protocol_state_advertising">Suche nach Geräten…</string>
+    <string name="protocol_state_advertising">Warte auf Verbindung…</string>
     <string name="protocol_state_connected">Verbunden</string>
     <string name="protocol_state_error">Fehler</string>
 
     <!-- ── Protocol card detail lines ──────────────────────────── -->
-    <string name="protocol_detail_disabled">In Einstellungen aktivieren</string>
-    <string name="protocol_detail_waiting">Warte auf Sender…</string>
-    <string name="protocol_detail_connected">Streaming von %1$s</string>
-    <string name="protocol_detail_error">WLAN-Einstellungen prüfen</string>
+    <string name="protocol_detail_disabled">Diesen Empfänger in den Einstellungen aktivieren</string>
+    <string name="protocol_detail_waiting">Empfänger gestartet; warte auf eine Verbindung</string>
+    <string name="protocol_detail_connected">Mit %1$s verbunden</string>
+    <string name="protocol_detail_error">Netzwerkverbindung und Gerätekompatibilität prüfen</string>
 
     <!-- ── Service states ──────────────────────────────────────── -->
     <string name="service_state_running">Aktiv</string>
@@ -38,9 +48,9 @@
     <string name="section_controls">Dienst-Steuerung</string>
 
     <!-- ── Control buttons ─────────────────────────────────────── -->
-    <string name="action_start">Starten</string>
+    <string name="action_start">Dienst starten</string>
     <string name="action_stop">Stoppen</string>
-    <string name="action_restart">Neustart</string>
+    <string name="action_restart">Dienst neu starten</string>
 
     <!-- ── Notification ────────────────────────────────────────── -->
     <string name="notification_channel_name">PhairPlay-Dienst</string>
@@ -61,22 +71,29 @@
     <string name="setting_display_name_system_default">Systemname wird verwendet</string>
     <string name="setting_airplay_enabled">AirPlay-Empfänger</string>
     <string name="setting_airplay_subtitle">Verbindungen von macOS akzeptieren</string>
-    <string name="setting_miracast_enabled">Miracast-Empfänger</string>
-    <string name="setting_miracast_subtitle">Verbindungen von Windows und Android akzeptieren</string>
-    <string name="setting_cast_enabled">Google Cast-Empfänger</string>
-    <string name="setting_cast_subtitle">Verbindungen von Chrome und Android akzeptieren</string>
+    <string name="setting_miracast_enabled">Miracast-Empfänger (experimentell)</string>
+    <string name="setting_miracast_subtitle">Erkennung und Verbindungsablauf sind noch in Entwicklung; Medienwiedergabe ist noch nicht verfügbar. Einige Geräte unterstützen den Empfang möglicherweise nicht.</string>
+    <string name="setting_cast_enabled">Google Cast-Empfänger (experimentell)</string>
+    <string name="setting_cast_subtitle">Medienwiedergabe ist noch in Entwicklung; vollständige Tests benötigen Google Play-Dienste und eine konfigurierte Cast-App-ID.</string>
     <string name="setting_mirror_audio">Spiegel-Audio</string>
     <string name="setting_mirror_audio_subtitle">Den Ton des Macs beim Spiegeln wiedergeben</string>
     <string name="setting_start_on_boot">Beim Starten automatisch starten</string>
+    <string name="setting_start_on_boot_subtitle">Empfängerdienst nach dem Gerätestart automatisch starten</string>
     <string name="setting_debug_overlay">Debug-Overlay</string>
     <string name="setting_debug_overlay_subtitle">FPS und Latenz auf dem Streaming-Bildschirm anzeigen</string>
     <string name="setting_version">Version</string>
+    <string name="setting_version_value">%1$s (Build %2$d)</string>
+    <string name="setting_version_details">GitHub · Versionshinweise und Projektinfo</string>
+    <string name="setting_version_link_unavailable">GitHub-Link kann nicht geöffnet werden</string>
     <string name="setting_reset_defaults">Auf Standardwerte zurücksetzen</string>
     <string name="setting_reset_defaults_message">Alle Einstellungen einschließlich Gerätemodus, Lautstärkeanzeige und Nachttischuhr werden zurückgesetzt. Dieser Vorgang kann nicht rückgängig gemacht werden.</string>
     <string name="setting_reset_confirm">Zurücksetzen</string>
 
     <!-- ── Now-playing widgets ─────────────────────────────────── -->
     <string name="now_playing_weather_city_missing">Wetter · Stadt in den Einstellungen festlegen</string>
+    <string name="setting_widget_clock_subtitle">Aktuelle Uhrzeit auf dem Wiedergabebildschirm anzeigen</string>
+    <string name="setting_widget_date_subtitle">Lokales Datum neben der Uhrzeit anzeigen</string>
+    <string name="setting_widget_weather_subtitle">Internetverbindung erforderlich; Stadt unten festlegen</string>
     <string name="now_playing_weather_loading">Wetter · %1$s · wird aktualisiert</string>
     <string name="now_playing_weather_unavailable">Wetter · nicht verfügbar, neuer Versuch folgt</string>
     <string name="now_playing_weather_city_not_found">Stadt nicht gefunden</string>
