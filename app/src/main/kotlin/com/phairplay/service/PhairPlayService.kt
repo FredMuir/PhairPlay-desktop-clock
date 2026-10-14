@@ -171,20 +171,27 @@ class PhairPlayService : Service() {
             Logger.w("No ConnectivityManager — mDNS will not recover automatically from a network drop")
             return
         }
+        // AirPlay discovery and streaming stay on the local Wi-Fi LAN; they do not depend on
+        // Internet validation or a cellular default route. Listening only for Wi-Fi also avoids
+        // tearing down and re-registering mDNS when an unrelated mobile-data network changes.
         val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .build()
+        var activeWifiNetwork: Network? = null
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                if (activeWifiNetwork == network) return
+                activeWifiNetwork = network
                 if (_serviceState.value != ServiceState.Running) return
-                Logger.i("Network available — re-advertising over mDNS")
+                Logger.i("Wi-Fi network available — re-advertising over mDNS")
                 airPlayReceiver?.readvertise()
             }
 
             override fun onLost(network: Network) {
+                if (activeWifiNetwork == network) activeWifiNetwork = null
                 // Nothing to do: the registration is already gone with the interface. Logged
                 // because it is the other half of the story when reading a diagnostic dump.
-                Logger.i("Network lost — mDNS advertisement is gone until it returns")
+                Logger.i("Wi-Fi network lost — mDNS advertisement is gone until it returns")
             }
         }
         runCatching { cm.registerNetworkCallback(request, callback) }

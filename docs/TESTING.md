@@ -1,12 +1,56 @@
-# PhairPlay Testing Guide
+# PhairPlay Testing Guide / PhairPlay 测试指南
 
-This document explains how to run tests, what is tested, and how to perform manual testing on real devices.
-
-Choose checks based on the changed behavior and target device. UI-only changes can use builds and visual inspection; changes to protocol, audio output, volume, or synchronization require targeted playback checks. A build or screenshot does not establish runtime compatibility, and release acceptance still requires the relevant scenarios below.
+**EN:** This guide explains automated tests, validation coverage and manual checks on real devices. Select checks based on the change and target device. UI-only changes need build and visual inspection; protocol, audio, volume or synchronization changes need targeted playback checks. A successful build or screenshot alone does not establish runtime compatibility.
+**中文：** 本指南说明自动化测试、验证范围及实体设备手动检查方法。请根据变更内容和目标设备选择检查项：仅修改界面时应构建并目视检查；修改协议、音频输出、音量或同步时还需专项播放检查。构建成功或有截图都不能单独证明运行兼容性。
 
 ---
 
-## How to Run Tests
+## Device Validation Record / 设备验证记录
+
+### 2026-10-13 — Phone and tablet compatibility milestone / 手机与平板兼容性阶段
+
+Build: `versionCode 64`, `versionName 1.0.61-tbj607f` (`googletvDebug`).
+
+| Device / environment | Result |
+|---|---|
+| Lenovo TB-J607F physical tablet | Full `MainActivityTest` instrumented suite: 9/9 passed. |
+| OnePlus 7 Pro (GM1910), Android 14 | Full `MainActivityTest` instrumented suite: 9/9 passed. The Lenovo device list discovered the OnePlus receiver. |
+| API 31 tablet emulator | Targeted clock fit test: 1/1 passed. |
+| API 31 phone emulator | A full v64 run was interrupted when the AVD disconnected from ADB during test execution; the targeted clock test had passed before disconnect. |
+
+**中文对照：**
+
+| 设备 / 环境 | 结果 |
+|---|---|
+| Lenovo TB-J607F 实体平板 | 完整 `MainActivityTest` 仪器测试：9/9 通过。 |
+| OnePlus 7 Pro（GM1910），Android 14 | 完整 `MainActivityTest` 仪器测试：9/9 通过。Lenovo 设备列表可发现 OnePlus 接收器。 |
+| API 31 平板模拟器 | 时钟适配专项测试：1/1 通过。 |
+| API 31 手机模拟器 | 完整 v64 测试期间 AVD 与 ADB 断开，测试被中止；断开前时钟专项测试已通过。 |
+
+**EN:** The OnePlus foreground receiver service kept advertising `_airplay._tcp` and `_raop._tcp` while the display was in Doze. This record covers UI, installation and discovery checks; it does not establish end-to-end AirPlay audio playback on v64.
+**中文：** OnePlus 屏幕进入 Doze 时，前台接收服务仍持续广播 `_airplay._tcp` 和 `_raop._tcp`。本记录覆盖界面、安装及设备发现检查，但不代表 v64 的 AirPlay 音频端到端播放已验证。
+
+### Release scope and open issues / 本版范围与待解决问题
+
+- The API 31 phone emulator's full v64 run lost its ADB connection during test 7. The targeted clock test passed before the disconnect; this is an incomplete run, not a pass for the full suite.
+- AirPlay sender-to-receiver media playback, mirroring, codec interoperability, and multi-room synchronization were not revalidated on v64. Discovery and UI results must not be treated as playback acceptance.
+- AirPlay 2 buffered audio (type 103) is accepted by the control path but is not yet played back.
+- Google Cast and Miracast media playback remain incomplete; only their control/setup paths are implemented.
+- Manufacturer-specific multicast filtering, battery management, unusual aspect ratios, split-screen, and non-default display/font scaling are not exhaustively validated. Discovery may vary by Wi-Fi access point and Android vendor.
+- The v64 device-test APKs were signed by different debug identities. Installing an APK signed by a different identity may require uninstalling the existing app, which removes its local app data. Later development APKs use the workspace's shared signing configuration; see [development signing](DEVELOPMENT_SIGNING.md).
+
+**中文对照：**
+
+- API 31 手机模拟器的完整 v64 测试在第 7 项期间失去 ADB 连接。断开前时钟专项测试已通过；完整测试未完成，不能视为整套测试通过。
+- v64 未重新验证 AirPlay 发送端到接收端的媒体播放、镜像、编码器互通或多房间同步。设备发现和界面结果不能代替播放验收。
+- AirPlay 2 缓冲音频（type 103）会被控制路径接受，但目前不会播放。
+- Google Cast 和 Miracast 媒体播放尚未完成，目前实现的是控制/设置路径。
+- 厂商多播过滤、电池管理、特殊宽高比、分屏及非默认显示/字体缩放尚未全面验证。设备发现可能因 Wi-Fi 接入点和 Android 厂商而异。
+- v64 设备测试 APK 曾使用不同的调试签名身份。安装由其他身份签名的 APK 可能需要卸载现有应用，卸载会删除应用本地数据。后续开发 APK 使用工作区共享签名配置；详见[开发签名说明](DEVELOPMENT_SIGNING.md)。
+
+## How to Run Tests / 如何运行测试
+
+**中文：** 下方命令及详细测试步骤是本仓库自动化测试和实体设备手动验证的操作说明。运行 Android 仪器测试前，请先连接设备或启动模拟器，并确认 `adb devices` 能识别目标设备。
 
 ### Unit Tests (no device required)
 
@@ -251,3 +295,33 @@ Target values:
 | No CI hardware for video tests | MediaCodec tests can't run in CI | Manual testing required before release |
 | FairPlay content can't be tested | Protected content (Netflix, etc.) is blocked by Apple — expected behavior | Document as known limitation in README |
 | Wi-Fi quality varies | Latency tests may fail on congested 2.4 GHz | Test on 5 GHz or Ethernet |
+
+## 中文测试操作对照
+
+本节对应上方英文自动化和手动测试说明。测试结果应记录在[设备验证记录](#device-validation-record--设备验证记录)和版本记录中；以下手动场景是发布验收流程，不代表本次预发布版已经全部通过。
+
+### 自动化检查
+
+- **单元测试：** `./gradlew test` 运行两种产品风味的单元测试；也可运行 `./gradlew testGoogletvDebugUnitTest` 或 `./gradlew testFiretvDebugUnitTest`，或用 `--tests` 指定测试类。报告位于 `app/build/reports/tests/`。CI 协议/单元测试以 `:test-runner:test` 为准；部分依赖 Android 框架的测试在主机 JVM 上不稳定。
+- **仪器测试：** 连接实体 Android 设备或启动模拟器，然后运行 `adb devices` 确认连接，再运行 `./gradlew connectedAndroidTest`。这类测试覆盖界面及系统集成。
+- **Lint 和 CI 构建：** `./gradlew lint` 执行 Android Lint。完整本地 CI 检查命令见上方英文步骤；它会运行协议测试、两个风味的 Lint 和调试 APK 构建。
+
+### 手动测试前准备
+
+每台设备开始测试前保存干净基线：运行 `adb devices -l` 检查设备，并用 `adb logcat -c` 清空旧日志。分别为 Google TV/Android TV 与 Fire TV 构建并安装对应调试 APK。若需要真实 Google Cast 测试，先在 Google Cast SDK Developer Console 注册接收器并配置 Cast App ID；详情见 [Google Cast App ID 指南](guides/CAST_APP_ID.md)。失败后先运行 `tools/collect-device-logs.sh` 收集设备、包信息、内存、CPU 和筛选后的 logcat，再重启应用。若两个产品风味都已安装，可设置 `PHAIRPLAY_PACKAGE` 指定收集哪个包。
+
+### 发布前手动验收场景
+
+下列场景是通用验收流程；发布前应在 Google TV/Android TV 和 Fire TV 上执行。本次 v64 发布记录中未声称这些场景全部通过。
+
+1. **应用启动：** 安装并从电视应用列表启动 PhairPlay；确认 WaitingScreen 显示设备名称、无崩溃对话框或 FATAL 日志，并稳定运行 30 秒。
+2. **mDNS 发现：** Mac 与电视接入同一 Wi-Fi，启动应用后检查 AirPlay 菜单；目标设备应在 3 秒内出现。退出应用后应在 10 秒内消失。
+3. **屏幕镜像连接：** 从 Mac 选择电视；预期电视切换到 StreamingScreen。日志应记录 OPTIONS → ANNOUNCE → SETUP → SETUP → RECORD 且全部返回 `200 OK`，不得出现 RTSP `4xx`/`5xx`。停止镜像后，电视应在 2 秒内回到 WaitingScreen。
+4. **视频质量：** 镜像毫秒计时画面 5 分钟；预期帧率至少 25 fps、延迟不超过 100 ms，且无黑屏闪烁或画面冻结。也可查看 macOS 的屏幕共享质量诊断。
+5. **音画同步：** 播放拍板音画同步测试视频；拍板画面闭合时声音应同步，偏差不应超过约 40 ms。
+6. **稳定性：** 连续串流 30 分钟；预期无断开或崩溃、没有 FATAL 或重连日志，电视仍显示串流界面，内存低于 150 MB。
+7. **断线重连：** 分别测试发送端关闭镜像，以及 Mac 暂时断开再恢复 Wi-Fi/以太网。发送端关闭后电视应在 2 秒内回到 WaitingScreen，5 秒后重新连接无需重启应用；网络恢复后设备应在 5 秒内重新出现在 AirPlay 菜单。
+
+### 性能目标与限制
+
+串流时记录内存和 CPU（英文步骤提供 ADB 命令），目标为峰值内存不超过 150 MB、平均 CPU 不超过 30%、帧率至少 25 fps、延迟不超过 100 ms。CI 没有视频硬件，无法运行 MediaCodec 实测；FairPlay 保护内容无法用于播放验证，这是预期限制；拥挤的 2.4 GHz Wi-Fi 可能导致延迟测试失败，建议改用 5 GHz Wi-Fi 或以太网。

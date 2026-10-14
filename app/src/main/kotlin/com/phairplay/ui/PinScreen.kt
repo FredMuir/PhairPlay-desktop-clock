@@ -27,11 +27,13 @@ class PinScreen @JvmOverloads constructor(
         val column = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
+            setPadding(dp(24), 0, dp(24), 0)
         }
         val label = TextView(context).apply {
             text = context.getString(R.string.pairing_pin_title)
             setTextColor(color(R.color.text_secondary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            maxLines = 2
             gravity = Gravity.CENTER
         }
         pinView = TextView(context).apply {
@@ -41,18 +43,23 @@ class PinScreen @JvmOverloads constructor(
             letterSpacing = 0.2f
             setPadding(0, dp(16), 0, 0)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                setAutoSizeTextTypeUniformWithConfiguration(40, 72, 2, TypedValue.COMPLEX_UNIT_SP)
+            }
         }
         val hint = TextView(context).apply {
             text = context.getString(R.string.pairing_pin_hint)
             setTextColor(color(R.color.text_tertiary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            maxLines = 3
+            breakStrategy = android.text.Layout.BREAK_STRATEGY_HIGH_QUALITY
             gravity = Gravity.CENTER
             setPadding(0, dp(24), 0, 0)
         }
-        column.addView(label)
-        column.addView(pinView)
-        column.addView(hint)
-        addView(column, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+        column.addView(label, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        column.addView(pinView, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        column.addView(hint, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(column, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER
         })
     }

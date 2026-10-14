@@ -160,7 +160,13 @@ class BufferedAudioServer(
                 .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .setSampleRate(outputRate).setChannelMask(channelMask).build())
                 .setBufferSizeInBytes(maxOf(targetBufferBytes, 2048))
-                .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                .also {
+                    // Low-latency mode is available from API 26; retain the normal streaming
+                    // mode on Fire TV devices running API 25.
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        it.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                    }
+                }
                 .setTransferMode(AudioTrack.MODE_STREAM).build().also {
                     it.setVolume(1f)
                     audioTrack = it

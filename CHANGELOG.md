@@ -25,6 +25,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build completion does not imply complete AirPlay sender-control, iCloud account, playback, synchronization, or all-device UI validation. See [testing](docs/TESTING.md) and the [development roadmap](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md). / 构建完成不代表 AirPlay 发送端控制、iCloud 账号、播放、同步或所有设备界面均已完整验证。详见[测试说明](docs/TESTING.md)和[开发路线图](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md)。
 - Artifact: `PhairPlay-1.0.85-unified-debug.apk` (universal debug APK). / 安装包：`PhairPlay-1.0.85-unified-debug.apk`（通用调试 APK）。
 
+## [1.0.61-tbj607f] - 2026-10-13
+
+> GitHub prerelease for device testing. It is a development build, not a production or store release.
+
+### Changed
+- Add responsive layouts and dimensions for portrait phones, landscape layouts, and sw600dp tablets; keep screen content centered and reserve space for clock seconds and volume controls.
+- Improve receiver UI adaptation and service/network behavior for Android phone and tablet hardware.
+- Increase Android `versionCode` to 64 (`1.0.61-tbj607f`).
+
+### Fixed
+- Prevent the seconds digit from being clipped at the edge of the clock on narrow displays.
+- Improve AirPlay service discovery and foreground receiver stability on the OnePlus 7 Pro.
+
+### Validation
+- Lenovo TB-J607F physical tablet: all 9 `MainActivityTest` instrumented UI tests passed on v64.
+- OnePlus 7 Pro (GM1910), Android 14: all 9 `MainActivityTest` instrumented UI tests passed on v64; the Lenovo device list discovered the OnePlus receiver.
+- API 31 emulator: targeted clock-layout test passed. A full v64 phone-emulator run was interrupted when the AVD disconnected from ADB during test execution.
+- On the OnePlus, the foreground service remained active and AirPlay mDNS registrations remained visible after the screen entered doze.
+- End-to-end AirPlay audio playback was not revalidated as part of this UI/device compatibility milestone.
+
 ### Fixed
 - Reduce AirPlay multi-room join lag by waiting for advancing `AudioTrack` timestamps before applying phase feedback, then skipping up to one second of already-late startup audio in a bounded phase correction. Small residual errors still use the existing servo.
 - Keep the PCM converter's rate clamp aligned with the temporary catch-up limit.
