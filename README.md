@@ -20,9 +20,9 @@
 
 ## Project Status / 项目状态
 
-**EN:** The current development version is **1.0.85** (`versionCode` 88), available as a universal debug build for device validation. This public repository is an independent development fork, not the original project's release channel. Check this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases) for published packages and prereleases.
+**EN:** The current version is **1.0.86** (`versionCode` 89), published as a universal device-validation prerelease. This public repository is an independent development fork, not the original project's release channel. Download the APK and read the version-specific notes on this fork's [Releases page](https://github.com/FredMuir/PhairPlay-desktop-clock/releases). The APK is a development build; see the validation scope below before relying on a feature.
 
-**中文：** 当前开发版本为 **1.0.85**（`versionCode` 88），提供用于设备验证的通用调试包。本公开仓库是独立开发 fork，不是原始项目的发布渠道。发布版和预发布版见本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)。
+**中文：** 当前版本为 **1.0.86**（`versionCode` 89），以通用设备验证预发布版形式提供。本公开仓库是独立开发 fork，不是原始项目的发布渠道。APK 下载和版本说明见本 fork 的[发布页面](https://github.com/FredMuir/PhairPlay-desktop-clock/releases)。此 APK 属于开发版本，使用前请查看下方验证范围。
 
 **EN:** One universal APK targets compatible Android phones, tablets, Google/Android TV, and Fire TV. A device is not considered validated until tested; playback, mDNS discovery, screen sizing, remote controls, and audio synchronization can vary by Android version and manufacturer. See [docs/TESTING.md](docs/TESTING.md) for validation scope.
 
@@ -40,9 +40,9 @@
 
 **中文：** 构建指南、验证边界、同步与界面经验以及维护建议，见 [PhairPlay 维护手册](docs/MAINTENANCE_PLAYBOOK_ZH.md)。
 
-**EN:** The bilingual [development history, UI principles, integration research, and roadmap](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md) records current feature status and the 1.0.85 validation scope.
+**EN:** The bilingual [development history, UI principles, integration research, and roadmap](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md) records current feature status and the 1.0.86 validation scope.
 
-**中文：** [中英双语开发历史、UI 原则、集成研究与路线图](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md)记录了当前功能状态及 1.0.85 的验证范围。
+**中文：** [中英双语开发历史、UI 原则、集成研究与路线图](docs/DEVELOPMENT_HISTORY_AND_ROADMAP.md)记录了当前功能状态及 1.0.86 的验证范围。
 
 **EN:** All Android debug and release artifacts in the shared workspace use the same signing identity. See the [workspace signing policy](../ANDROID_SIGNING_POLICY_ZH.md) before building or installing.
 
@@ -95,6 +95,10 @@
   **中文：** Miracast Wi-Fi Direct/WFD 广播和 RTSP 控制面；Google Cast Connect SDK 生命周期（端到端测试需要 Cast 应用 ID）。
 - **EN:** No ads or analytics. AirPlay reception stays on the local network; the optional weather widget uses the internet.
   **中文：** 不含广告或分析功能。AirPlay 接收仅使用局域网；可选天气组件需要互联网。
+- **EN:** Optional Home Assistant discovery, setup, dashboard display, and common entity controls. HA setup needs a server address and long-lived access token; dashboard rendering depends on the configured HA server and browser compatibility.
+  **中文：** 可选的 Home Assistant 自动发现、配置、仪表盘展示和常用实体控制。连接需要 HA 地址和长期访问令牌；仪表盘显示取决于 HA 服务器配置及网页兼容性。
+- **EN:** The overview combines the clock with compact weather and agenda details. Larger Home Assistant dashboards can be opened as a separate playback page. Weather alerts are shown only when the configured source provides alert data; this build's Open-Meteo path does not provide alerts.
+  **中文：** 概览页将时钟与简要天气、日程信息合并；较大的 Home Assistant 仪表盘可在播放页单独切换。只有天气源提供预警数据时才显示预警；本版 Open-Meteo 数据路径不提供预警。
 - **EN:** Open source under the Apache 2.0 license.
   **中文：** 基于 Apache 2.0 许可证开源。
 

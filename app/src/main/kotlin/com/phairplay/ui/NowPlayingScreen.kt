@@ -7,6 +7,8 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.app.AlarmManager
 import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
@@ -21,6 +23,11 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.MotionEvent
 import android.view.GestureDetector
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.net.Uri
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
@@ -66,6 +73,11 @@ class NowPlayingScreen @JvmOverloads constructor(
     private var artworkInitialized = false
     private var displayedArtworkSample: IntArray? = null
     private var displayedArtworkTrackKey: String? = null
+    private var artworkTrackKey: String? = null
+    private var pendingArtwork: Bitmap? = null
+    private var pendingArtworkKey: String? = null
+    private var pendingArtworkTask: Runnable? = null
+    private var missingArtworkTask: Runnable? = null
     private var backdropStart = Color.rgb(8, 14, 27)
     private var backdropEnd = Color.rgb(24, 32, 53)
     private var baseBackdropStart = backdropStart
@@ -94,11 +106,17 @@ class NowPlayingScreen @JvmOverloads constructor(
     private lateinit var widgets: TextView
     private lateinit var pageTabs: LinearLayout
     private lateinit var pageTabsScroll: HorizontalScrollView
+    private lateinit var dashboardHost: FrameLayout
+    private lateinit var dashboardWebView: WebView
+    private lateinit var contentViewport: View
+    private val haDashboardPageIndices = mutableSetOf<Int>()
+    private var loadedDashboardUrl: String? = null
     private var infoPages: List<Pair<String, List<String>>> = emptyList()
     private var selectedInfoPage = 0
     private var renderedPageLabels: List<String> = emptyList()
     private var renderedSelectedPage = -1
     private var clockBaseSizeSp = CLOCK_SP
+    private var lastAdaptSignature: String? = null
     private val widgetHandler = Handler(Looper.getMainLooper())
     private var clockEnabled = true
     private var dateEnabled = true
@@ -130,6 +148,7 @@ class NowPlayingScreen @JvmOverloads constructor(
     private var haCalendars = ""
     private var haTodos = ""
     @Volatile private var haDeviceText: String? = null
+    @Volatile private var haDashboardPages: List<List<String>> = emptyList()
     @Volatile private var haScheduleText: String? = null
     @Volatile private var haPending = false
     private var lastHaRefreshAt = 0L
@@ -367,6 +386,7 @@ class NowPlayingScreen @JvmOverloads constructor(
             addView(scrollContent, FrameLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT))
         }
+        contentViewport = scrollViewport
         addView(scrollViewport, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(volumeColumn, LayoutParams(dp(80), LayoutParams.WRAP_CONTENT, Gravity.END or Gravity.CENTER_VERTICAL).apply {
             marginEnd = dp(18)
@@ -380,6 +400,42 @@ class NowPlayingScreen @JvmOverloads constructor(
             })
             addView(pageTabsFadeLayer, LinearLayout.LayoutParams(0, dp(INFO_TAB_HEIGHT_DP), 1f))
         }
+        dashboardWebView = WebView(context).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            isVerticalScrollBarEnabled = true
+            addJavascriptInterface(object {
+                @JavascriptInterface
+                fun getExternalAuth(message: String?) {
+                    val payload = runCatching { org.json.JSONObject(message.orEmpty()) }.getOrNull() ?: return
+                    if (payload.optString("callback") != "externalAuthSetToken") return
+                    val accessToken = HomeAssistant.token(context)
+                    val success = accessToken != null
+                    val tokenJson = if (success) org.json.JSONObject.quote(accessToken) else "null"
+                    val js = "window.externalAuthSetToken($success,${if (success) "{access_token:$tokenJson,expires_in:315360000}" else "undefined"});"
+                    post { evaluateJavascript(js, null) }
+                }
+            }, "externalApp")
+            webViewClient = object : WebViewClient() {
+                private fun allowed(uri: Uri): Boolean {
+                    val base = Uri.parse(haUrl.trim().trimEnd('/'))
+                    return uri.scheme == base.scheme && uri.host.equals(base.host, ignoreCase = true) &&
+                        uri.port == base.port
+                }
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                    !allowed(request.url)
+                @Suppress("DEPRECATION")
+                override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
+                    !runCatching { allowed(Uri.parse(url)) }.getOrDefault(false)
+            }
+        }
+        dashboardHost = FrameLayout(context).apply {
+            visibility = View.GONE
+            addView(dashboardWebView, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        }
+        addView(dashboardHost, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {
+            topMargin = dp(INFO_TAB_HEIGHT_DP + 12)
+        })
         addView(topControls, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT,
             Gravity.TOP or Gravity.CENTER_HORIZONTAL))
         clockContentColumn = column
@@ -465,7 +521,7 @@ class NowPlayingScreen @JvmOverloads constructor(
         haTodoEnabled = todoEnabled
         haTodos = todos
         lastHaRefreshAt = 0L
-        if (!enabled) { haDeviceText = null; haScheduleText = null }
+        if (!enabled) { haDeviceText = null; haDashboardPages = emptyList(); haScheduleText = null }
         refreshWidgets()
     }
 
@@ -517,10 +573,25 @@ class NowPlayingScreen @JvmOverloads constructor(
         } else {
             val percent = (level * 100f / scale).roundToInt().coerceIn(0, 100)
             val status = battery!!.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
-            batteryText = context.getString(
-                if (status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
-                    status == android.os.BatteryManager.BATTERY_STATUS_FULL) R.string.now_playing_battery_charging
-                else R.string.now_playing_battery, percent)
+            val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+            val full = status == android.os.BatteryManager.BATTERY_STATUS_FULL
+            val eta = if (charging && android.os.Build.VERSION.SDK_INT >= 28) {
+                runCatching { (context.getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager).computeChargeTimeRemaining() }
+                    .getOrNull()?.takeIf { it > 0L }
+            } else null
+            batteryText = when {
+                full -> context.getString(R.string.now_playing_battery_full, percent)
+                charging && eta != null -> {
+                    val minutes = (eta / 60_000L).toInt().coerceAtLeast(1)
+                    val hours = minutes / 60
+                    val remainder = minutes % 60
+                    context.getString(R.string.now_playing_battery_charging_eta, percent,
+                        if (hours > 0) context.getString(R.string.now_playing_battery_eta_hours_minutes, hours, remainder)
+                        else context.getString(R.string.now_playing_battery_eta_minutes, minutes))
+                }
+                charging -> context.getString(R.string.now_playing_battery_charging_unknown_eta, percent)
+                else -> context.getString(R.string.now_playing_battery, percent)
+            }
         }
         if (::widgets.isInitialized) refreshWidgets()
     }
@@ -530,7 +601,8 @@ class NowPlayingScreen @JvmOverloads constructor(
         val timeLines = mutableListOf<String>()
         val scheduleLines = mutableListOf<String>()
         val weatherLines = mutableListOf<String>()
-        val deviceLines = mutableListOf<String>()
+        val pages = mutableListOf<Pair<String, List<String>>>()
+        val haPages = mutableListOf<Pair<String, List<String>>>()
         val nowMillis = System.currentTimeMillis()
         val now = java.util.Date(nowMillis)
         val locale = java.util.Locale.getDefault()
@@ -568,18 +640,22 @@ class NowPlayingScreen @JvmOverloads constructor(
         }
         if (haEnabled) {
             if (nowMillis - lastHaRefreshAt >= 60_000L && !haPending) loadHomeAssistant(nowMillis)
-            if (haEntities.isNotBlank()) deviceLines += haDeviceText ?: context.getString(R.string.now_playing_ha_loading)
+            if (haUrl.isNotBlank() && HomeAssistant.token(context) != null)
+                haPages += context.getString(R.string.now_playing_info_ha) to emptyList()
             if (haCalendarEnabled || haTodoEnabled) scheduleLines += haScheduleText ?: context.getString(R.string.now_playing_ha_loading)
         }
         if (iCloudEnabled) {
             if (nowMillis - lastICloudRefreshAt >= 15 * 60_000L && !iCloudPending) loadICloudCalendar(nowMillis)
             scheduleLines += iCloudText ?: context.getString(R.string.now_playing_icloud_loading)
         }
-        val pages = mutableListOf<Pair<String, List<String>>>()
-        if (timeLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_time) to timeLines
-        if (scheduleLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_schedule) to scheduleLines
-        if (weatherLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_weather) to weatherLines
-        if (deviceLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_devices) to deviceLines
+        // Current weather and today's agenda are compact clock-page context. Keep
+        // page turns for the larger Home Assistant device/control view.
+        val clockPageLines = timeLines + weatherLines + scheduleLines
+        if (clockPageLines.isNotEmpty()) pages += context.getString(R.string.now_playing_info_time) to clockPageLines
+        haDashboardPageIndices.clear()
+        val dashboardStart = pages.size
+        pages.addAll(haPages)
+        for (index in dashboardStart until pages.size) haDashboardPageIndices += index
         if (pages.map { it.first } != infoPages.map { it.first }) selectedInfoPage = selectedInfoPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
         infoPages = pages
         updateInfoPageControls()
@@ -626,15 +702,58 @@ class NowPlayingScreen @JvmOverloads constructor(
             renderedSelectedPage = selectedInfoPage
         }
         val lines = infoPages.getOrNull(selectedInfoPage)?.second.orEmpty()
-        widgets.text = lines.joinToString("\n")
+        val text = lines.joinToString("\n")
+        if (widgets.text.toString() != text) widgets.text = text
         widgets.visibility = if (lines.isEmpty()) View.GONE else View.VISIBLE
+        val showingDashboard = selectedInfoPage in haDashboardPageIndices
+        dashboardHost.visibility = if (showingDashboard) View.VISIBLE else View.GONE
+        contentViewport.visibility = if (showingDashboard) View.GONE else View.VISIBLE
+        volumeColumn.visibility = if (showingDashboard) View.GONE else View.VISIBLE
+        if (showingDashboard) loadDashboardIfNeeded()
         pageTabsScroll.post { updatePageTabFades() }
+    }
+
+    private fun loadDashboardIfNeeded() {
+        val base = haUrl.trim().trimEnd('/')
+        if (base.isBlank() || HomeAssistant.token(context) == null) return
+        if (loadedDashboardUrl == base) return
+        loadedDashboardUrl = base
+        dashboardWebView.loadUrl("$base/?external_auth=1")
     }
 
     private fun showInfoPage(index: Int) {
         if (infoPages.isEmpty()) return
-        selectedInfoPage = Math.floorMod(index, infoPages.size)
+        val nextPage = Math.floorMod(index, infoPages.size)
+        if (nextPage == selectedInfoPage) return
+        val direction = if (index > selectedInfoPage) 1 else -1
+        val previousText = widgets.text
+        selectedInfoPage = nextPage
         updateInfoPageControls()
+        val nextText = widgets.text
+        val nextVisibility = widgets.visibility
+        widgets.text = previousText
+        widgets.visibility = if (previousText.isNullOrEmpty()) View.GONE else View.VISIBLE
+        val distance = dp(22).toFloat() * direction
+        widgets.animate().cancel()
+        widgets.alpha = 1f
+        widgets.translationX = 0f
+        widgets.animate()
+            .alpha(0f)
+            .translationX(-distance)
+            .setDuration(110L)
+            .withEndAction {
+                if (!isAttachedToWindow) return@withEndAction
+                widgets.text = nextText
+                widgets.visibility = nextVisibility
+                widgets.translationX = distance
+                widgets.alpha = 0f
+                widgets.animate()
+                    .alpha(1f)
+                    .translationX(0f)
+                    .setDuration(190L)
+                    .start()
+            }
+            .start()
         pageTabs.getChildAt(selectedInfoPage)?.let { pageTabsScroll.smoothScrollTo(it.left - dp(12), 0) }
     }
 
@@ -648,7 +767,7 @@ class NowPlayingScreen @JvmOverloads constructor(
         lastHaRefreshAt = nowMillis
         haPending = true
         val url = haUrl
-        val entities = haEntities.split(',', '\n').map { it.trim() }.filter { it.matches(Regex("[a-z_]+\\.[a-zA-Z0-9_]+")) }.take(4)
+        val entities = haEntities.split(',', '\n').map { it.trim() }.filter { it.matches(Regex("[a-z_]+\\.[a-zA-Z0-9_]+")) }.take(8)
         val calendars = if (haCalendarEnabled) haCalendars.split(',', '\n').map(String::trim).filter { it.startsWith("calendar.") }.take(3) else emptyList()
         val todos = if (haTodoEnabled) haTodos.split(',', '\n').map(String::trim).filter { it.startsWith("todo.") }.take(3) else emptyList()
         weatherExecutor.execute {
@@ -678,12 +797,15 @@ class NowPlayingScreen @JvmOverloads constructor(
                     val title = state.optJSONObject("attributes")?.optString("friendly_name").orEmpty().ifBlank { id }
                     scheduleLines += context.getString(R.string.now_playing_ha_todo_experimental, title, state.optString("state"))
                 }
-                deviceLines.joinToString("\n") to scheduleLines.joinToString("\n")
-            }.getOrElse { context.getString(R.string.now_playing_ha_unavailable) to context.getString(R.string.now_playing_ha_unavailable) }
+                deviceLines.chunked(4) to scheduleLines.joinToString("\n")
+            }.getOrElse { listOf(listOf(context.getString(R.string.now_playing_ha_unavailable))) to context.getString(R.string.now_playing_ha_unavailable) }
             widgetHandler.post {
                 haPending = false
                 if (haEnabled) {
-                    haDeviceText = result.first.ifBlank { if (haEntities.isBlank()) null else context.getString(R.string.now_playing_ha_no_selection) }
+                    haDashboardPages = result.first.ifEmpty {
+                        if (haUrl.isNotBlank() && HomeAssistant.token(context) != null) listOf(listOf(context.getString(R.string.now_playing_ha_no_selection))) else emptyList()
+                    }
+                    haDeviceText = haDashboardPages.firstOrNull()?.joinToString("\n")
                     haScheduleText = result.second.ifBlank { if (haCalendarEnabled || haTodoEnabled) context.getString(R.string.now_playing_ha_no_selection) else null }
                     refreshWidgets()
                 }
@@ -866,8 +988,8 @@ class NowPlayingScreen @JvmOverloads constructor(
                 val geo = org.json.JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=1&language=$language&format=json"))
                 val place = geo.optJSONArray("results")?.optJSONObject(0) ?: error(context.getString(R.string.now_playing_weather_city_not_found))
                 val lat = place.getDouble("latitude"); val lon = place.getDouble("longitude")
-                val forecast = org.json.JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code&timezone=auto"))
-                    .getJSONObject("current")
+                val response = org.json.JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code&hourly=precipitation_probability,precipitation&forecast_days=2&timezone=auto"))
+                val forecast = response.getJSONObject("current")
                 val temp = forecast.getDouble("temperature_2m").toInt()
                 val code = forecast.getInt("weather_code")
                 val condition = when (code) {
@@ -881,7 +1003,25 @@ class NowPlayingScreen @JvmOverloads constructor(
                     in 95..99 -> R.string.now_playing_weather_thunderstorm
                     else -> R.string.now_playing_weather_cloudy
                 }
-                context.getString(R.string.now_playing_weather_result, city, context.getString(condition), temp)
+                val hourly = response.getJSONObject("hourly")
+                val times = hourly.optJSONArray("time")
+                val probabilities = hourly.optJSONArray("precipitation_probability")
+                val amounts = hourly.optJSONArray("precipitation")
+                val nowText = forecast.optString("time")
+                val endHour = runCatching { java.time.LocalDateTime.parse(nowText).plusHours(24).toString().take(13) }.getOrDefault(nowText.take(13))
+                val rainIndices = (0 until (times?.length() ?: 0)).filter { i ->
+                    val time = times?.optString(i).orEmpty()
+                    time >= nowText.take(13) && time <= endHour &&
+                        (probabilities?.optInt(i, 0) ?: 0) >= 30 && (amounts?.optDouble(i, 0.0) ?: 0.0) >= 0.1
+                }
+                val precipitation = if (rainIndices.isEmpty()) context.getString(R.string.now_playing_weather_rain_none)
+                else {
+                    val first = times!!.optString(rainIndices.first()).takeLast(5)
+                    val maxProbability = rainIndices.maxOf { probabilities!!.optInt(it, 0) }
+                    context.getString(R.string.now_playing_weather_rain_expected, first, maxProbability)
+                }
+                context.getString(R.string.now_playing_weather_result, city, context.getString(condition), temp) +
+                    "\n" + precipitation
             }
             result.onSuccess { weather ->
                 widgetHandler.post {
@@ -924,6 +1064,9 @@ class NowPlayingScreen @JvmOverloads constructor(
     private fun adaptOrientation(column: LinearLayout, scrollViewport: ScrollView) {
         val landscape = isLandscapeUi()
         val bedsideLandscape = idleClockMode && landscape
+        val signature = "${width}x${height}:$landscape:$idleClockMode:${resources.configuration.orientation}"
+        if (signature == lastAdaptSignature) return
+        lastAdaptSignature = signature
         column.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
         val density = resources.displayMetrics.density
         val availableWidth = (width / density).toInt().coerceAtLeast(320)
@@ -1086,38 +1229,59 @@ class NowPlayingScreen @JvmOverloads constructor(
         val trackKey = listOf(info.title, info.artist, info.album)
             .map { it?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty() }
             .joinToString("\u001f")
+        val hadArtworkState = artworkInitialized
         val isNewTrack = !artworkInitialized || trackKey != displayedArtworkTrackKey
         if (isNewTrack) {
             artworkInitialized = true
             displayedArtworkTrackKey = trackKey
-            displayedArtwork = info.artwork?.copyOf()
-            val bitmap = info.artwork?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size) }.getOrNull() }
-            if (bitmap != null && isVisuallySameArtwork(bitmap)) {
-                // The decoded frame is unused; release it rather than accumulating one Bitmap per
-                // metadata refresh. Sampling tolerance ignores compression noise that used to
-                // cause the same cover to blink on every metadata packet.
-                bitmap.recycle()
-                Logger.d("NowPlayingScreen: visually unchanged artwork; skipped redraw")
-            } else {
-                if (bitmap != null) {
-                    animateBackdropTo(bitmap)
-                    artwork.scaleType = ImageView.ScaleType.CENTER_CROP
-                    transitionArtwork(BitmapDrawable(resources, bitmap))
-                    displayedArtworkSample = sampleArtwork(bitmap)
+            artworkTrackKey = null
+            pendingArtworkTask?.let(widgetHandler::removeCallbacks)
+            pendingArtworkTask = null
+            pendingArtwork?.takeIf { !it.isRecycled }?.recycle()
+            pendingArtwork = null
+            missingArtworkTask?.let(widgetHandler::removeCallbacks)
+            missingArtworkTask = null
+            if (displayedArtworkTrackKey == trackKey && !artworkInitialized) artworkInitialized = true
+        }
+        val bytes = info.artwork
+        if (bytes != null) {
+            val candidate = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
+            if (candidate != null) {
+                missingArtworkTask?.let(widgetHandler::removeCallbacks)
+                missingArtworkTask = null
+                if (isVisuallySameArtwork(candidate)) {
+                    candidate.recycle()
+                    artworkTrackKey = trackKey
                 } else {
-                    animateBackdropTo(null)
-                    // No artwork from the sender (typical for raw system audio) — show the AirPlay glyph.
-                    artwork.scaleType = ImageView.ScaleType.CENTER_INSIDE
-                    val glyph = requireNotNull(androidx.appcompat.content.res.AppCompatResources.getDrawable(context, R.drawable.ic_airplay)).mutate().apply {
-                        setTint(color(R.color.text_secondary))
+                    pendingArtwork?.takeIf { !it.isRecycled }?.recycle()
+                    pendingArtwork = candidate
+                    pendingArtworkKey = trackKey
+                    pendingArtworkTask?.let(widgetHandler::removeCallbacks)
+                    val task = Runnable {
+                        val bitmap = pendingArtwork
+                        pendingArtwork = null
+                        pendingArtworkTask = null
+                        if (bitmap != null && !bitmap.isRecycled && pendingArtworkKey == displayedArtworkTrackKey) {
+                            artworkTrackKey = pendingArtworkKey
+                            animateBackdropTo(bitmap)
+                            artwork.scaleType = ImageView.ScaleType.CENTER_CROP
+                            transitionArtwork(BitmapDrawable(resources, bitmap))
+                            displayedArtworkSample = sampleArtwork(bitmap)
+                        } else bitmap?.takeIf { !it.isRecycled }?.recycle()
                     }
-                    transitionArtwork(glyph)
-                    displayedArtworkSample = null
-                    if (info.artwork != null) {
-                        Logger.w("NowPlayingScreen: artwork bytes (${info.artwork.size}B) failed to decode")
-                    }
+                    pendingArtworkTask = task
+                    widgetHandler.postDelayed(task, 180L)
                 }
+            } else Logger.w("NowPlayingScreen: artwork bytes (${bytes.size}B) failed to decode")
+        } else if (isNewTrack && !hadArtworkState && displayedArtworkSample == null) {
+            showArtworkPlaceholder()
+        } else if (isNewTrack) {
+            val task = Runnable {
+                missingArtworkTask = null
+                if (displayedArtworkTrackKey == trackKey && artworkTrackKey != trackKey) showArtworkPlaceholder()
             }
+            missingArtworkTask = task
+            widgetHandler.postDelayed(task, 1600L)
         }
 
         titleView.text = info.title ?: context.getString(R.string.now_playing_audio)
@@ -1125,11 +1289,28 @@ class NowPlayingScreen @JvmOverloads constructor(
         albumView.setTextVisible(info.album)
     }
 
-    /** Crossfades only on a track-key change; metadata refreshes never touch the artwork view. */
+    private fun showArtworkPlaceholder() {
+        animateBackdropTo(null)
+        artwork.scaleType = ImageView.ScaleType.CENTER_INSIDE
+        val glyph = requireNotNull(androidx.appcompat.content.res.AppCompatResources.getDrawable(context, R.drawable.ic_airplay)).mutate().apply {
+            setTint(color(R.color.text_secondary))
+        }
+        transitionArtwork(glyph)
+        displayedArtworkSample = null
+    }
+
+    /** Crossfades from the currently composited frame, including an in-flight transition. */
     private fun transitionArtwork(next: Drawable) {
         val current = artwork.drawable
         val previous = when (current) {
-            is TransitionDrawable -> current.getDrawable(1)
+            is TransitionDrawable -> {
+                val width = artwork.width.coerceAtLeast(1)
+                val height = artwork.height.coerceAtLeast(1)
+                BitmapDrawable(resources, Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { snapshot ->
+                    val canvas = Canvas(snapshot)
+                    artwork.draw(canvas)
+                })
+            }
             null -> ColorDrawable(Color.TRANSPARENT)
             else -> current
         }
@@ -1147,10 +1328,17 @@ class NowPlayingScreen @JvmOverloads constructor(
     /** Releases the (potentially large) artwork bitmap when the card is hidden. */
     fun clear() {
         setBedsideClockMode(false)
+        pendingArtworkTask?.let(widgetHandler::removeCallbacks)
+        missingArtworkTask?.let(widgetHandler::removeCallbacks)
+        pendingArtwork?.takeIf { !it.isRecycled }?.recycle()
+        pendingArtwork = null
+        pendingArtworkTask = null
+        missingArtworkTask = null
         artworkInitialized = false
         displayedArtwork = null
         displayedArtworkSample = null
         displayedArtworkTrackKey = null
+        artworkTrackKey = null
         artwork.setImageDrawable(null)
     }
 

@@ -25,6 +25,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.phairplay.BuildConfig
 import com.phairplay.R
+import com.phairplay.MainActivity
 import com.phairplay.settings.AppSettings
 import com.phairplay.settings.AirPlayDeviceMode
 import com.phairplay.settings.SettingsRepository
@@ -326,7 +327,7 @@ class SettingsFragment : Fragment() {
         rowDisplayName.setOnClickListener { showDisplayNameDialog() }
         rowWidgetStyle.setOnClickListener { showWidgetStyleDialog() }
         rowWeatherCity.setOnClickListener { showWeatherCityDialog() }
-        rowHaConfig.setOnClickListener { showHomeAssistantDialog() }
+        rowHaConfig.setOnClickListener { (activity as? MainActivity)?.openHomeAssistantPage() }
         rowICloudConfig.setOnClickListener { showICloudDialog() }
         rowDeviceMode.setOnClickListener { showDeviceModeDialog() }
         rowAudioScreenTimeout.setOnClickListener { showAudioScreenTimeoutDialog() }
@@ -402,52 +403,6 @@ class SettingsFragment : Fragment() {
         AlertDialog.Builder(requireContext()).setTitle(R.string.setting_weather_city).setView(input)
             .setPositiveButton(android.R.string.ok) { _, _ -> val city = input.text.toString().trim(); textWeatherCityValue.text = city.ifBlank { getString(R.string.setting_weather_not_set) }; save { it.copy(weatherCity = city) } }
             .setNegativeButton(android.R.string.cancel, null).show()
-    }
-
-    private fun showHomeAssistantDialog() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val current = settingsRepository.settingsFlow.first()
-            val fields = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 8, 48, 0) }
-            fun field(hintRes: Int, value: String, type: Int = InputType.TYPE_CLASS_TEXT, lines: Int = 1) = EditText(requireContext()).apply {
-                hint = getString(hintRes); setText(value); inputType = type; minLines = lines; maxLines = lines
-            }
-            val url = field(R.string.setting_ha_url_hint, current.homeAssistantUrl, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
-            val token = field(R.string.setting_ha_token_hint, "", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
-            val entities = field(R.string.setting_ha_entities_hint, current.homeAssistantEntities, lines = 2)
-            val calendars = field(R.string.setting_ha_calendars_hint, current.homeAssistantCalendars, lines = 2)
-            val todos = field(R.string.setting_ha_todos_hint, current.homeAssistantTodos, lines = 2)
-            fields.addView(url); fields.addView(token); fields.addView(entities); fields.addView(calendars); fields.addView(todos)
-            AlertDialog.Builder(requireContext())
-                .setTitle(R.string.setting_ha_config)
-                .setMessage(R.string.setting_ha_config_help)
-                .setView(fields)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    val address = url.text.toString().trim().trimEnd('/')
-                    val enteredToken = token.text.toString().trim()
-                    if (enteredToken.isNotEmpty()) HomeAssistant.saveToken(requireContext(), enteredToken)
-                    val hasToken = enteredToken.isNotEmpty() || HomeAssistant.token(requireContext()) != null
-                    textHaConfigValue.text = address.ifBlank { getString(R.string.setting_ha_config_subtitle) }
-                    save { it.copy(homeAssistantUrl = address, homeAssistantEntities = entities.text.toString(),
-                        homeAssistantCalendars = calendars.text.toString(), homeAssistantTodos = todos.text.toString(),
-                        homeAssistantEnabled = address.isNotBlank() && hasToken) }
-                    if (address.isNotBlank() && hasToken) {
-                        viewLifecycleOwner.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            val valid = runCatching { HomeAssistant.request(address, HomeAssistant.token(requireContext()).orEmpty(), "/api/") }.isSuccess
-                            launch(kotlinx.coroutines.Dispatchers.Main) {
-                                if (isAdded) Toast.makeText(requireContext(), if (valid) R.string.setting_ha_connected else R.string.setting_ha_connection_failed, Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
-                }
-                .setNeutralButton(R.string.setting_ha_disconnect) { _, _ ->
-                    HomeAssistant.clearToken(requireContext())
-                    textHaConfigValue.text = getString(R.string.setting_ha_config_subtitle)
-                    save { it.copy(homeAssistantUrl = "", homeAssistantEnabled = false, homeAssistantCalendarEnabled = false, homeAssistantTodoEnabled = false) }
-                    setToggle(rowHaEntities, false); setToggle(rowHaCalendar, false); setToggle(rowHaTodo, false)
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-        }
     }
 
     private fun showICloudDialog() {

@@ -76,6 +76,25 @@ Weather remains an optional network-backed display. Keep source adapters small a
 
 Do not copy whole third-party projects or vendor dependency caches to add an integration. Prefer documented protocols, minimal maintained libraries when necessary, and clear attribution/license notices.
 
+## Release 1.0.86 (versionCode 89)
+
+This is a universal device-validation **debug** APK distributed as a GitHub prerelease. It is intended for compatibility feedback, not presented as a production/Play Store release.
+
+### Changes
+
+- Add a Home Assistant management page with local discovery, guided long-lived-token setup, entity browsing, and common controls.
+- Show the configured Home Assistant dashboard as its own playback page, without album, lyric, or track details.
+- Combine compact clock, agenda, and weather details on the overview page; reserve page switching for larger information views.
+- Add charging state and estimated time to full charge, plus a 24-hour precipitation outlook and expected rain time. Weather-source alert availability is explained in Settings.
+- Simplify app and playback navigation labels, and improve album-art changes between tracks.
+- Center launcher icon artwork across adaptive, monochrome, and legacy vector resources.
+
+### Validation
+
+- Built version 1.0.86 (`versionCode` 89) as a universal debug APK. The revised navigation, overview, playback page, and Home Assistant dashboard presentation were checked on the Lenovo TB-J607F tablet on the immediately preceding 1.0.85 build; 1.0.86 itself has not been separately installed.
+- This check does not establish complete AirPlay playback/control, iCloud account, weather-alert, or cross-device validation; see [Testing](TESTING.md).
+- Artifact: `PhairPlay-1.0.86-universal-debug.apk` (universal debug package). No signing secrets or device-specific certificate details belong in the repository or release text.
+
 ## Release 1.0.85 (versionCode 88)
 
 This release candidate is a universal **debug** APK signed using the workspace’s existing shared signing configuration. It is intended for installation and compatibility feedback, not presented as a production/Play Store release.
@@ -183,6 +202,25 @@ PhairPlay 包含只读 iCloud CalDAV 日历客户端。设置使用 Apple 账户
 - 持续改善无障碍、本地化完整度和自适应图标，同时避免不必要地增加依赖体积。
 
 增加集成时不要复制整个第三方项目或厂商依赖缓存。优先使用有文档的协议；确需依赖时选择精简且维护中的库，并清楚注明归属与许可证。
+
+## 1.0.86 版本（versionCode 89）
+
+该版本是通用设备验证 **debug 调试 APK**，以 GitHub 预发布版形式提供，用于兼容性反馈，不应描述为正式商店版。
+
+### 功能改动
+
+- 新增 Home Assistant 管理页，支持局域网发现、长期令牌引导、实体浏览和常用控制。
+- 在播放页独立显示已配置的 Home Assistant 仪表盘，不混入专辑、歌词或歌曲详情。
+- 将简要时钟、日程和天气信息合并到概览页；页面切换用于较大的信息视图。
+- 显示充电状态、预计充满时间、未来 24 小时降水情况及预计降雨时间；天气源预警能力在设置中说明。
+- 精简应用和播放页导航文案，并改善歌曲切换时的专辑图过渡。
+- 调整自适应、单色和旧版矢量启动器图标的图形，使其整体居中。
+
+### 验证信息
+
+- 已构建 1.0.86（`versionCode` 89）通用调试 APK。新版导航、概览、播放页和 Home Assistant 仪表盘展示已在前一版 1.0.85 上通过 Lenovo TB-J607F 平板检查；1.0.86 尚未单独安装。
+- 此检查不代表 AirPlay 播放/控制、iCloud 账号、天气预警或其他设备均已验证；详见[测试说明](TESTING.md)。
+- 安装包：`PhairPlay-1.0.86-universal-debug.apk`（通用调试版）。仓库和发布说明不得包含签名密钥或设备专用证书信息。
 
 ## 1.0.85 版本（versionCode 88）
 

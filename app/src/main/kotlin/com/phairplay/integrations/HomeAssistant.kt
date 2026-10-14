@@ -76,6 +76,17 @@ object HomeAssistant {
     fun state(baseUrl: String, token: String, entityId: String): JSONObject =
         JSONObject(request(baseUrl, token, "/api/states/${entityId.trim()}"))
 
+    fun states(baseUrl: String, token: String): List<JSONObject> =
+        org.json.JSONArray(request(baseUrl, token, "/api/states")).let { values ->
+            (0 until values.length()).mapNotNull { values.optJSONObject(it) }
+        }
+
+    fun callService(baseUrl: String, token: String, domain: String, service: String, entityId: String, data: JSONObject = JSONObject()) {
+        require(domain.matches(Regex("[a-z_]+")) && service.matches(Regex("[a-z_]+")))
+        data.put("entity_id", entityId)
+        request(baseUrl, token, "/api/services/$domain/$service", data)
+    }
+
     fun calendars(baseUrl: String, token: String, entityId: String, start: String, end: String): JSONArray =
         JSONArray(request(baseUrl, token, "/api/calendars/${entityId.trim()}?start=${java.net.URLEncoder.encode(start, "UTF-8")}&end=${java.net.URLEncoder.encode(end, "UTF-8")}"))
 }

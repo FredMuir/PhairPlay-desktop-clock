@@ -7,6 +7,24 @@
 
 ## Device Validation Record / 设备验证记录
 
+### 2026-10-14 — Version 1.0.86 / 1.0.86 版本
+
+Build: `versionCode 89`, `versionName 1.0.86` (`universalDebug`).
+
+| Device / environment | Result |
+|---|---|
+| Lenovo TB-J607F physical tablet | The revised app navigation, overview, playback controls, and Home Assistant dashboard page were visually checked on the immediately preceding 1.0.85 build. Version 1.0.86 was built but not separately installed. Receiver/service or end-to-end playback validation is not claimed for this release entry. |
+
+**中文对照：**
+
+| 设备 / 环境 | 结果 |
+|---|---|
+| Lenovo TB-J607F 实体平板 | 应用导航、概览、播放控制和 Home Assistant 仪表盘页面已在前一版 1.0.85 上目视检查。1.0.86 已构建，但未单独安装。本次发布记录不声称接收服务或端到端播放已验证。|
+
+This UI validation does not establish complete AirPlay playback or sender-control behavior, iCloud account setup, weather alerts, or compatibility on other device classes. Use the release-specific notes and open issues below to interpret the results.
+
+**中文：** 此界面验证不代表 AirPlay 播放或发送端控制、iCloud 账号配置、天气预警或其他设备类型的兼容性已完整验证。请结合版本说明和待解决问题理解测试结果。
+
 ### 2026-10-13 — Phone and tablet compatibility milestone / 手机与平板兼容性阶段
 
 Build: `versionCode 64`, `versionName 1.0.61-tbj607f` (`googletvDebug`).

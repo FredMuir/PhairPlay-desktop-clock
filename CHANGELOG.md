@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.86] - 2026-10-14
+
+> Universal device-validation prerelease / 通用设备验证预发布版
+
+### Added / 新增
+- Add a Home Assistant management page with local discovery, guided long-lived-token setup, entity browsing, and common controls. / 新增 Home Assistant 管理页，支持局域网发现、长期令牌引导、实体浏览和常用控制。
+- Show the configured Home Assistant dashboard as its own playback page, without album, lyric, or track details. / 在播放页独立显示已配置的 Home Assistant 仪表盘，不混入专辑、歌词或歌曲详情。
+- Add charging state and estimated time to full charge, plus a 24-hour precipitation outlook and expected rain time. / 显示充电状态和预计充满时间，并提供未来 24 小时降水情况及预计降雨时间。
+
+### Changed / 变更
+- Combine compact time, calendar, and weather details on the overview page; reserve page switching for larger dashboards or broader views. / 将简要时间、日程和天气信息合并到概览页；页面切换用于较大的仪表盘或总体信息视图。
+- Simplify top-level and playback navigation labels and remove the separate Home Assistant app tab. / 精简应用主导航与播放页按钮文案，并移除独立的 Home Assistant 应用顶栏选项。
+- Keep weather-source alert limitations in Settings instead of showing an unhelpful “no alert data” message on the display. / 将天气源预警能力限制说明放在设置中，不在展示界面显示无用的“没有预警数据”提示。
+- Improve album-art changes to transition from the previous artwork directly to the next track. / 改进专辑图切换，使画面从上一首直接过渡到下一首。
+- Center the launcher icon artwork across adaptive, monochrome, and legacy vector resources. / 调整自适应、单色和旧版矢量启动器图标的图形，使其整体居中。
+
+### Validation / 验证
+- Built version 1.0.86 (`versionCode` 89) as a universal debug APK. The revised navigation, overview, playback page, and Home Assistant dashboard presentation were checked on the Lenovo TB-J607F tablet on the immediately preceding 1.0.85 build; 1.0.86 itself has not been separately installed. / 已构建 1.0.86（`versionCode` 89）通用调试 APK。新版导航、概览、播放页和 Home Assistant 仪表盘展示已在前一版 1.0.85 上通过 Lenovo TB-J607F 平板检查；1.0.86 尚未单独安装。
+- This device check does not establish complete AirPlay playback/control, iCloud account, weather-alert, or cross-device validation. See [testing](docs/TESTING.md). / 此次设备检查不代表 AirPlay 播放/控制、iCloud 账号、天气预警或其他设备的验证已完成。详见[测试说明](docs/TESTING.md)。
+- Artifact: `PhairPlay-1.0.86-universal-debug.apk` (universal debug APK). / 安装包：`PhairPlay-1.0.86-universal-debug.apk`（通用调试 APK）。
+
 ## [1.0.85] - 2026-10-14
 
 > Universal debug prerelease for device validation / 面向设备验证的通用调试预发布版

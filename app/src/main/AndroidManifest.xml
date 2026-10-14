@@ -78,6 +78,7 @@
     <application
         android:name=".PhairPlayApp"
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:banner="@drawable/app_banner"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"

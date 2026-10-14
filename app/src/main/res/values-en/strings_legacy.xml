@@ -6,7 +6,7 @@
     <string name="nav_home_compact">Audio</string>
     <string name="nav_settings_compact">Settings</string>
     <string name="nav_devices_compact">Devices</string>
-    <string name="nav_now_playing_compact">Clock</string>
+    <string name="nav_now_playing_compact">Overview</string>
     <string name="notification_channel_name">PhairPlay Service</string>
     <string name="notification_channel_description">Persistent notification for the AirPlay/Miracast/Cast receiver service</string>
     <string name="notification_status_running">Receiver active — advertising on network</string>
@@ -106,7 +106,7 @@
     <string name="waiting_subtitle">Select this device on an Apple device to start playing</string>
     <string name="waiting_device_label">Device name:</string>
     <string name="streaming_hint">Press Back to stop playback</string>
-    <string name="nav_now_playing">Clock / playback</string>
+    <string name="nav_now_playing">Overview</string>
     <string name="setting_audio_screen_off">Allow the screen to turn off during playback</string>
     <string name="setting_audio_screen_off_subtitle">Turn off the screen after the selected idle period while audio continues</string>
     <string name="setting_audio_screen_timeout">Screen-off idle time</string>
@@ -123,7 +123,7 @@
     <string name="setting_widget_agenda_unavailable">Calendar is temporarily unavailable</string>
     <string name="setting_widget_agenda_permission_needed">Allow calendar access to show today’s agenda</string>
     <string name="setting_widget_weather">Weather on playback screen</string>
-    <string name="setting_widget_weather_subtitle">Requires internet access; set a city below</string>
+    <string name="setting_widget_weather_subtitle">Open-Meteo provides forecasts and precipitation, but no weather alerts</string>
     <string name="setting_widget_style">Widget style</string>
     <string name="setting_widget_style_minimal">Minimal</string>
     <string name="setting_widget_style_card">Card</string>

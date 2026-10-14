@@ -35,6 +35,7 @@ import com.phairplay.ui.PhotoScreen
 import com.phairplay.ui.PinScreen
 import com.phairplay.ui.SettingsFragment
 import com.phairplay.ui.DevicesFragment
+import com.phairplay.ui.HomeAssistantFragment
 import com.phairplay.ui.StreamingScreen
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -287,7 +288,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         navItemSettings.setOnClickListener {
-            if (selectedNavIndex != 1) {
+            if (selectedNavIndex != 1 || supportFragmentManager.findFragmentById(R.id.content_container) !is SettingsFragment) {
                 navigateTo(SettingsFragment(), navItemSettings)
             }
         }
@@ -339,6 +340,12 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.content_container, fragment)
             .commit()
+    }
+
+    /** Opens Home Assistant management from Settings. */
+    fun openHomeAssistantPage() {
+        if (!::navItemSettings.isInitialized) return
+        navigateTo(HomeAssistantFragment(), navItemSettings)
     }
 
     /**

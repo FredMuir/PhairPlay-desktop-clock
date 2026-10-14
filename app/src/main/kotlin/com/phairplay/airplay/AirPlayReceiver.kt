@@ -414,6 +414,15 @@ class AirPlayReceiver(
             },
             currentOutputVolumeDb = { airplayVolumeDb },
             onNowPlayingMetadata = { title, artist, album ->
+                val previousTrack = listOf(npTitle, npArtist, npAlbum)
+                    .map { it?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty() }
+                val nextTrack = listOf(title, artist, album)
+                    .map { it?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty() }
+                if (previousTrack != nextTrack) {
+                    // Artwork is sent in a separate RTSP request. Never attach the previous
+                    // track's cached image to new metadata while waiting for the new image.
+                    npArtwork = null
+                }
                 npTitle = title; npArtist = artist; npAlbum = album
                 emitNowPlaying()
             },
