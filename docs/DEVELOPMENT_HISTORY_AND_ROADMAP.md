@@ -192,6 +192,8 @@ PhairPlay 包含只读 iCloud CalDAV 日历客户端。设置使用 Apple 账户
 
 PhairPlay 当前是 AirPlay 接收端，尚不能向 HomePod 发送 Android 音频。对 [HomePodLink](https://gitee.com/hello_unibody/home-pod-link) 提交 [`47829f6`](https://gitee.com/hello_unibody/home-pod-link/tree/47829f6035a1cfb0b53211800cf0877b77896287) 的只读审查记录了其 RAOP 发送流程、PCM 定速队列、NTP 定时和丢包恢复。该仓库声明 GPL-2.0，原生源码还注明参考 AirFlash；没有复制代码或依赖。详见[中英双语研究记录](research/HOMEPODLINK_RAOP_STUDY.md)。
 
+本次进一步调研了 GitHub/Gitee 上 Android 时钟屏保、HA kiosk/墙面屏、墨水屏时钟，以及 Android、Windows、Linux AirPlay 发送端。主要启发是区分概览/夜间/警报状态、标明离线数据时效、为 NSD 注册重叠建立真实设备复现检查，并把未来发送功能与现有接收生命周期隔离。项目列表、设计总结和许可证备注见[跨平台项目调研](research/CROSS_PLATFORM_PROJECTS.md)。这只是研究记录；尚未因此改动运行时代码或添加依赖。
+
 ## 路线图
 
 ### 下一步

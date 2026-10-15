@@ -108,6 +108,10 @@
 
 **中文：** PhairPlay 当前是 AirPlay 接收端，尚不能把 Android 音频发送到 HomePod。我们审查了 Android RAOP/AirPlay 音频发送项目 [HomePodLink](https://gitee.com/hello_unibody/home-pod-link)，固定版本为[提交 `47829f6`](https://gitee.com/hello_unibody/home-pod-link/tree/47829f6035a1cfb0b53211800cf0877b77896287)。研究记录了 mDNS 发现、RTSP/HAP 会话、RTP PCM 定速发送、NTP 定时和丢包恢复，并将可选发送端列为后续研究方向。HomePodLink 声明 GPL-2.0，因此没有将其源码或打包依赖复制进本 Apache-2.0 项目。详见[中英双语协议与实现研究](docs/research/HOMEPODLINK_RAOP_STUDY.md)。
 
+**EN:** We also surveyed public projects on GitHub and Gitee across Android, Windows, Linux, and ESP8266 for always-on clocks, Home Assistant dashboards, kiosk recovery, and AirPlay audio sending. The [cross-platform project study](docs/research/CROSS_PLATFORM_PROJECTS.md) records practical design lessons, an NSD registration question to verify on real devices, and license boundaries. No project code or dependencies were copied.
+
+**中文：** 我们还调研了 GitHub 和 Gitee 上 Android、Windows、Linux 与 ESP8266 平台的常显时钟、Home Assistant 仪表盘、kiosk 恢复及 AirPlay 音频发送项目。[跨平台项目调研](docs/research/CROSS_PLATFORM_PROJECTS.md)记录了可借鉴的设计、需要在真实设备验证的 NSD 注册问题及许可证边界。本次未复制任何项目代码或依赖。
+
 ## What PhairPlay Does Not Do / PhairPlay 不支持的功能
 
 - **EN:** FairPlay DRM content (Netflix, Disney+, Apple TV+) cannot be decrypted by this open-source receiver.
