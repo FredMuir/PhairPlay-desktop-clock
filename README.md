@@ -102,6 +102,12 @@
 - **EN:** Open source under the Apache 2.0 license.
   **中文：** 基于 Apache 2.0 许可证开源。
 
+## AirPlay audio output research / AirPlay 音频输出研究
+
+**EN:** PhairPlay currently receives AirPlay; it does not send Android audio to HomePod. We reviewed [HomePodLink](https://gitee.com/hello_unibody/home-pod-link), an Android RAOP/AirPlay audio sender, at [commit `47829f6`](https://gitee.com/hello_unibody/home-pod-link/tree/47829f6035a1cfb0b53211800cf0877b77896287). The study covers mDNS discovery, RTSP/HAP session setup, RTP PCM pacing, NTP timing, and packet-loss recovery, and records an optional sender as a future research item. HomePodLink declares GPL-2.0, so its code and bundled dependencies were not copied into this Apache-2.0 project. See the [bilingual protocol and implementation study](docs/research/HOMEPODLINK_RAOP_STUDY.md).
+
+**中文：** PhairPlay 当前是 AirPlay 接收端，尚不能把 Android 音频发送到 HomePod。我们审查了 Android RAOP/AirPlay 音频发送项目 [HomePodLink](https://gitee.com/hello_unibody/home-pod-link)，固定版本为[提交 `47829f6`](https://gitee.com/hello_unibody/home-pod-link/tree/47829f6035a1cfb0b53211800cf0877b77896287)。研究记录了 mDNS 发现、RTSP/HAP 会话、RTP PCM 定速发送、NTP 定时和丢包恢复，并将可选发送端列为后续研究方向。HomePodLink 声明 GPL-2.0，因此没有将其源码或打包依赖复制进本 Apache-2.0 项目。详见[中英双语协议与实现研究](docs/research/HOMEPODLINK_RAOP_STUDY.md)。
+
 ## What PhairPlay Does Not Do / PhairPlay 不支持的功能
 
 - **EN:** FairPlay DRM content (Netflix, Disney+, Apple TV+) cannot be decrypted by this open-source receiver.
@@ -282,3 +288,4 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 - [openairplay/airplay-spec](https://github.com/openairplay/airplay-spec) — **EN:** Community-maintained AirPlay protocol documentation. **中文：** 社区维护的 AirPlay 协议文档。
 - [UxPlay](https://github.com/FDH2/UxPlay) — **EN:** Open-source AirPlay mirror server used as a reference. **中文：** 开源 AirPlay 镜像服务器，供实现参考。
 - [RPiPlay](https://github.com/FD-/RPiPlay) — **EN:** AirPlay mirroring for Raspberry Pi, used as a reference. **中文：** 面向 Raspberry Pi 的 AirPlay 镜像项目，供实现参考。
+- [HelloUnibody/HomePodLink](https://gitee.com/hello_unibody/home-pod-link) — **EN:** Android RAOP/AirPlay audio sender; protocol and implementation reviewed as a future sender-mode reference. No source or dependencies were copied; see the [study](docs/research/HOMEPODLINK_RAOP_STUDY.md). **中文：** Android RAOP/AirPlay 音频发送端；作为未来发送模式的协议与实现参考进行了研究。未复制源码或依赖，详见[研究记录](docs/research/HOMEPODLINK_RAOP_STUDY.md)。

@@ -25,6 +25,10 @@ PhairPlay is an independent fork. Keep project scope and compatibility statement
 
 For the detailed reverse-control evidence, command mapping, volume behavior, and live verification checklist, see [AirPlay remote-control research](AIRPLAY_REMOTE_CONTROL_RESEARCH.md). For rationale behind the adaptive visual direction, see [ADR-003](decisions/ADR-003-ui-design.md). For the separate DLNA study, see [ADR-004](decisions/ADR-004-dlna-mediarenderer-roadmap.md).
 
+### AirPlay audio output research
+
+PhairPlay currently receives AirPlay and does not send Android audio to HomePod. A read-only review of [HomePodLink](https://gitee.com/hello_unibody/home-pod-link) at commit [`47829f6`](https://gitee.com/hello_unibody/home-pod-link/tree/47829f6035a1cfb0b53211800cf0877b77896287) documented its RAOP sender flow, paced PCM queue, NTP timing, and packet-loss recovery. The repository declares GPL-2.0 and its native source names AirFlash as an implementation reference; no code or dependencies were copied. See the [bilingual study](research/HOMEPODLINK_RAOP_STUDY.md).
+
 ## UI design principles and copy rules
 
 1. **Keep the primary task clear.** AirPlay connection and playback are first-class; the ambient clock and optional information should not obscure them. Do not describe the app as “adding a tablet to a sound space.” Explain what a control does in direct, compact language.
@@ -72,6 +76,7 @@ Weather remains an optional network-backed display. Keep source adapters small a
 - Assess a richer information-card system with user-selected cards, sensible page grouping, and persistence of page order.
 - Evaluate iCloud Reminders access separately from read-only calendar display, based on supported interfaces and account-security constraints.
 - Complete media playback paths for Google Cast and Miracast before presenting them as ready; evaluate UPnP/DLNA after documenting a focused interoperability test plan.
+- Evaluate an optional Android-to-HomePod RAOP sender as a separate feature. Start with a generated test tone, then assess local-file playback and system-audio capture; preserve the existing receiver lifecycle and require real HomePod interoperability and security tests. Implement independently against documented protocol behavior unless compatible reuse rights are established. See the [HomePodLink study](research/HOMEPODLINK_RAOP_STUDY.md).
 - Improve accessibility, localization completeness, and adaptive icon polish without increasing dependency footprint unnecessarily.
 
 Do not copy whole third-party projects or vendor dependency caches to add an integration. Prefer documented protocols, minimal maintained libraries when necessary, and clear attribution/license notices.
@@ -183,6 +188,10 @@ PhairPlay 包含只读 iCloud CalDAV 日历客户端。设置使用 Apple 账户
 
 天气仍是可选的联网信息显示。新增信息源应与播放服务隔离，明确权限、网络依赖、刷新行为、缓存/离线表现，以及是否能够控制设备。
 
+### AirPlay 音频输出研究
+
+PhairPlay 当前是 AirPlay 接收端，尚不能向 HomePod 发送 Android 音频。对 [HomePodLink](https://gitee.com/hello_unibody/home-pod-link) 提交 [`47829f6`](https://gitee.com/hello_unibody/home-pod-link/tree/47829f6035a1cfb0b53211800cf0877b77896287) 的只读审查记录了其 RAOP 发送流程、PCM 定速队列、NTP 定时和丢包恢复。该仓库声明 GPL-2.0，原生源码还注明参考 AirFlash；没有复制代码或依赖。详见[中英双语研究记录](research/HOMEPODLINK_RAOP_STUDY.md)。
+
 ## 路线图
 
 ### 下一步
@@ -199,6 +208,7 @@ PhairPlay 包含只读 iCloud CalDAV 日历客户端。设置使用 Apple 账户
 - 评估更完善的信息卡片系统，允许用户选择卡片、分组页面并保存页面顺序。
 - 根据支持的接口和账户安全约束，单独评估 iCloud 提醒事项接入，不与只读日历混为一谈。
 - 完成 Google Cast 与 Miracast 媒体接收路径后再标为可用；UPnP/DLNA 应先制定有针对性的互操作测试计划。
+- 将 Android 向 HomePod 发送 RAOP 音频作为独立可选功能评估。先验证生成测试音，再评估本地文件播放和系统音频捕获；保持现有接收服务生命周期不变，并要求真实 HomePod 互操作与安全测试。除非已确认源码复用权利兼容，否则根据公开协议独立实现。详见 [HomePodLink 研究记录](research/HOMEPODLINK_RAOP_STUDY.md)。
 - 持续改善无障碍、本地化完整度和自适应图标，同时避免不必要地增加依赖体积。
 
 增加集成时不要复制整个第三方项目或厂商依赖缓存。优先使用有文档的协议；确需依赖时选择精简且维护中的库，并清楚注明归属与许可证。
